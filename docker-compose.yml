@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16
+    container_name: bidhub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bidhub
+      POSTGRES_USER: bidhub
+      POSTGRES_PASSWORD: bidhub
+    # Published on 5433 by default: a locally-installed PostgreSQL usually already
+    # owns 5432, and that collision silently sends psql to the wrong server.
+    # Override with DB_PORT in .env if you want a different host port.
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - bidhub_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidhub -d bidhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  bidhub_pgdata:
