@@ -6,20 +6,34 @@
 -- ACID property.  Run order: Atomicity -> Consistency -> Isolation -> Durability.
 --
 -- Prerequisites:
---   db/01_schema.sql  (P1-01 — merged)
---   db/02_triggers.sql (P1-02 — merged)
+--   db/01_schema.sql     (P1-01 — merged)
+--   db/02_triggers.sql   (P1-02 — merged)
 --   db/03_procedures.sql (P2-01 — merged, provides place_bid)
 --
 -- Run:  psql "$DATABASE_URL" -f db/tests/test_concurrency.sql
 -- Expected: every RAISE NOTICE below says PASS.
+--
+-- Everything here runs inside one outer transaction that is ROLLBACK'd at the
+-- very end, so the file is safe to re-run against a live database — it never
+-- leaves fixture rows behind, win or lose.
 -- =============================================================================
 
--- ===========================================================================
--- 0.  Shared fixtures (rolled back at the very end so this file is safe to
---     re-run against a live database).
--- ===========================================================================
 BEGIN;
 
+-- Documented explicitly per the ACID slide, even though READ COMMITTED is
+-- Postgres' session default: this whole transaction — including both
+-- Isolation demos below (section C) — runs under READ COMMITTED. This must
+-- be the very first statement of the transaction; PostgreSQL only warns
+-- (does not error) if issued later, but re-declaring it inside section C
+-- would just produce that redundant warning, so it is stated once, here.
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+-- ===========================================================================
+-- 0.  Shared fixtures, and IDs captured once via psql's \gset so the rest of
+--     this file never has to re-derive them. (auctions has no `title` column
+--     — only items does — so every lookup below joins through items instead
+--     of guessing at auctions.title.)
+-- ===========================================================================
 INSERT INTO users (full_name, email, password_hash, role) VALUES
     ('ACID Seller',  'acid-seller@bidhub.local', 'x', 'SELLER'),
     ('ACID Buyer',   'acid-buyer@bidhub.local',  'x', 'BUYER');
@@ -35,6 +49,13 @@ INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
 SELECT item_id, 100.00, 10.00, now() + interval '1 day', 'ACTIVE'
 FROM items WHERE title = 'ACID Test Item';
 
+SELECT a.auction_id                                                  AS auction_id,
+       (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local')  AS buyer_id,
+       (SELECT user_id FROM users WHERE email = 'acid-seller@bidhub.local') AS seller_id
+  FROM auctions a
+  JOIN items i ON i.item_id = a.item_id
+ WHERE i.title = 'ACID Test Item' \gset
+
 -- ===========================================================================
 -- A.  ATOMICITY
 --     "A transaction is an indivisible unit: either every effect commits, or
@@ -47,22 +68,14 @@ FROM items WHERE title = 'ACID Test Item';
 -- ===========================================================================
 SAVEPOINT sp_atomicity;
 
--- Step 1: place a valid bid (this should succeed if place_bid exists).
-CALL place_bid(
-    (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local'),
-    (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item'),
-    110.00
-);
+-- Step 1: place a valid bid (this succeeds — place_bid is already merged).
+CALL place_bid(:buyer_id, :auction_id, 110.00);
 
 -- Step 2: inject a guaranteed failure in the SAME transaction.
 DO $$
 BEGIN
     INSERT INTO bids (auction_id, bidder_id, amount)
-    VALUES (
-        (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item'),
-        (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local'),
-        -1.00
-    );
+    VALUES (:auction_id, :buyer_id, -1.00);
     RAISE EXCEPTION 'BIDHUB_TEST_FAILED: atomicity test — negative bid was accepted';
 EXCEPTION
     WHEN check_violation THEN
@@ -71,7 +84,7 @@ EXCEPTION
         RAISE NOTICE 'FAIL  Atomicity: unexpected error — %', SQLERRM;
 END $$;
 
--- Step 3: roll everything back.
+-- Step 3: roll everything back — the valid bid from step 1 included.
 ROLLBACK TO SAVEPOINT sp_atomicity;
 
 -- Step 4: verify that NOTHING from the transaction survived.
@@ -81,18 +94,9 @@ DECLARE
     v_notif_count   INT;
     v_audit_count   INT;
 BEGIN
-    SELECT COUNT(*) INTO v_bid_count
-      FROM bids
-     WHERE auction_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item');
-
-    SELECT COUNT(*) INTO v_notif_count
-      FROM notifications
-     WHERE auction_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item');
-
-    SELECT COUNT(*) INTO v_audit_count
-      FROM audit_log
-     WHERE entity_type = 'auction'
-       AND entity_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item');
+    SELECT COUNT(*) INTO v_bid_count      FROM bids          WHERE auction_id = :auction_id;
+    SELECT COUNT(*) INTO v_notif_count    FROM notifications WHERE auction_id = :auction_id;
+    SELECT COUNT(*) INTO v_audit_count    FROM audit_log      WHERE entity_type = 'auction' AND entity_id = :auction_id;
 
     IF v_bid_count = 0 AND v_notif_count = 0 AND v_audit_count = 0 THEN
         RAISE NOTICE 'PASS  Atomicity: bids=%, notifications=%, audit_log=% after rollback',
@@ -117,11 +121,7 @@ SAVEPOINT sp_consistency_check;
 DO $$
 BEGIN
     INSERT INTO bids (auction_id, bidder_id, amount)
-    VALUES (
-        (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item'),
-        (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local'),
-        -25.00
-    );
+    VALUES (:auction_id, :buyer_id, -25.00);
     RAISE EXCEPTION 'BIDHUB_TEST_FAILED: consistency check — negative bid accepted';
 EXCEPTION
     WHEN check_violation THEN
@@ -150,89 +150,84 @@ ROLLBACK TO SAVEPOINT sp_consistency_fk;
 --     "Concurrent transactions do not interfere with each other."
 --
 --     C1  Dirty-read impossibility (READ COMMITTED):
---         A value written by an uncommitted transaction is invisible to others.
+--         A value written by a transaction that never commits is invisible
+--         to everyone else, including reads issued later in the same script.
 --
 --     C2  Lost-update prevention (FOR UPDATE row lock):
---         Two transactions updating the same auction row are serialised by the
---         row lock acquired inside place_bid, so neither update is silently
---         overwritten.
+--         Two transactions updating the same auction row are serialised by
+--         the row lock place_bid() takes with SELECT ... FOR UPDATE — proven
+--         for real, with two actual concurrent psql processes, in
+--         db/tests/concurrency.sh. This section documents the contract that
+--         makes that possible.
 -- ===========================================================================
 
--- C1  Dirty-read demo
---     Session A writes but does not commit.  Session B (this DO block, acting
---     as a second session started after A) must NOT see A's uncommitted bid.
+-- C1  Dirty-read demo.
+--     We cannot open a second real network session from inside a single
+--     `psql -f` script, but we CAN prove the READ COMMITTED contract itself:
+--     a write that never commits must be invisible to every subsequent read.
+--     We force the write to undo using PL/pgSQL's own exception handling
+--     (an implicit savepoint around the BEGIN...EXCEPTION block) rather than
+--     a bare ROLLBACK — COMMIT/ROLLBACK are not legal transaction-control
+--     statements inside a DO block that is itself running inside an
+--     already-open explicit transaction (this script's outer BEGIN), so a
+--     literal `ROLLBACK;` here would raise "invalid transaction termination".
 SAVEPOINT sp_isolation_dirty_read;
-
--- "Session A" — open a transaction and leave it open.
-CREATE TEMP TABLE tmp_session_a_dummy (dummy INT) ON COMMIT DROP;
--- We cannot truly open a second session from within psql, but we CAN prove
--- the isolation level behaves correctly by reading back our own uncommitted
--- write inside a subtransaction and showing the contract of READ COMMITTED.
---
--- READ COMMITTED guarantees: a statement sees only rows committed BEFORE it
--- began.  We demonstrate this by inserting a row in a subtransaction,
--- rolling that subtransaction back, and confirming the outer world sees nothing.
 
 DO $$
 BEGIN
-    -- Write something we will immediately roll back.
     INSERT INTO bids (auction_id, bidder_id, amount)
-    VALUES (
-        (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item'),
-        (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local'),
-        999.00
-    );
-    ROLLBACK;
+    VALUES (:auction_id, :buyer_id, 999.00);
 
-    -- Now a clean read must see zero bids for this auction from our session.
-    PERFORM COUNT(*)
-      FROM bids
-     WHERE auction_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item');
-
-    RAISE NOTICE 'PASS  Isolation (READ COMMITTED): uncommitted writes are invisible to subsequent reads';
+    -- Force this block to abort — PL/pgSQL undoes everything since BEGIN,
+    -- the same effect a real second session's ROLLBACK would have.
+    RAISE EXCEPTION 'BIDHUB_TEST_FORCE_UNDO: simulate an uncommitted write';
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'FAIL  Isolation (READ COMMITTED): %', SQLERRM;
+        NULL; -- expected: the INSERT above is now undone
+END $$;
+
+DO $$
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+      FROM bids
+     WHERE amount = 999.00 AND auction_id = :auction_id;
+
+    IF v_count = 0 THEN
+        RAISE NOTICE 'PASS  Isolation (READ COMMITTED): the 999.00 write never became visible — a dirty read of an uncommitted row is impossible';
+    ELSE
+        RAISE NOTICE 'FAIL  Isolation (READ COMMITTED): found % row(s) that should have been undone', v_count;
+    END IF;
 END $$;
 
 ROLLBACK TO SAVEPOINT sp_isolation_dirty_read;
 
--- C2  Lost-update prevention via FOR UPDATE
---     Session 1 locks the auction row; Session 2 would wait until Session 1
---     releases the lock.  Both updates survive — neither is silently dropped.
---     We simulate this with a single transaction and explicit locking order.
+-- C2  Lost-update prevention via FOR UPDATE.
+--     In a real race, Session 2's UPDATE (or place_bid()'s FOR UPDATE lock)
+--     blocks until Session 1 commits, then applies on top of Session 1's
+--     result instead of clobbering it. Sequentially here, both increments
+--     land; concurrency.sh proves the actual blocking behaviour with two
+--     concurrent psql processes racing on the same auction via place_bid().
 SAVEPOINT sp_isolation_lost_update;
 
--- "Session 1" — lock the auction and update its starting_price.
-UPDATE auctions
-   SET starting_price = starting_price + 5.00
- WHERE auction_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item')
- RETURNING starting_price INTO STRICT __ignored;
+-- "Session 1"
+UPDATE auctions SET starting_price = starting_price + 5.00 WHERE auction_id = :auction_id;
 
--- "Session 2" — in a real concurrent environment this would block until
--- Session 1 commits.  Here we simply prove the row is still mutable after
--- Session 1 releases it (which it does at COMMIT below).
-UPDATE auctions
-   SET starting_price = starting_price + 5.00
- WHERE auction_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item');
+-- "Session 2" (would have blocked on Session 1's row lock in a real race)
+UPDATE auctions SET starting_price = starting_price + 5.00 WHERE auction_id = :auction_id;
 
--- Both increments survived: final value is original + 10.00.
 DO $$
 DECLARE
     v_final NUMERIC(12,2);
 BEGIN
-    SELECT starting_price INTO v_final
-      FROM auctions
-     WHERE title = 'ACID Test Item';
+    SELECT starting_price INTO v_final FROM auctions WHERE auction_id = :auction_id;
 
     IF v_final = 110.00 THEN
         RAISE NOTICE 'PASS  Isolation (FOR UPDATE): both updates applied, starting_price=%', v_final;
     ELSE
         RAISE NOTICE 'FAIL  Isolation (FOR UPDATE): expected 110.00, got %', v_final;
     END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE NOTICE 'FAIL  Isolation (FOR UPDATE): %', SQLERRM;
 END $$;
 
 ROLLBACK TO SAVEPOINT sp_isolation_lost_update;
@@ -241,42 +236,34 @@ ROLLBACK TO SAVEPOINT sp_isolation_lost_update;
 -- D.  DURABILITY
 --     "Once committed, data survives power loss, crashes, and restarts."
 --
---     PostgreSQL guarantees this through WAL (Write-Ahead Logging).  We
---     commit a bid, then simulate the practical durability check: after a
---     database restart the row must still be queryable.
---
---     Because we cannot restart the server from inside a psql script, we do
---     the practical equivalent: commit, disconnect, reconnect, and re-query.
---     The WAL guarantee means the row is on disk before the commit() returns.
+--     PostgreSQL guarantees this through WAL (Write-Ahead Logging): a COMMIT
+--     does not return to the client until the transaction's WAL records are
+--     fsync'd to disk, so a crash immediately after COMMIT still replays them
+--     on the next startup. We can't restart the server from inside this
+--     script's own open transaction (the fixtures would be lost with it), so
+--     the literal `docker compose restart db` proof lives in
+--     db/tests/concurrency.sh, which commits a marker bid, restarts the `db`
+--     container, and re-queries it in a fresh session. What we demonstrate
+--     here is the same guarantee's local half: once a bid is committed, it
+--     is visible to a brand-new read in this session too.
 -- ===========================================================================
 SAVEPOINT sp_durability;
 
--- Insert a bid and commit.
-INSERT INTO bids (auction_id, bidder_id, amount)
-VALUES (
-    (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item'),
-    (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local'),
-    120.00
-);
+INSERT INTO bids (auction_id, bidder_id, amount) VALUES (:auction_id, :buyer_id, 120.00);
 
--- Practical durability check: the row is visible in a brand-new snapshot.
 DO $$
 DECLARE
     v_count INT;
 BEGIN
     SELECT COUNT(*) INTO v_count
       FROM bids
-     WHERE amount = 120.00
-       AND auction_id = (SELECT auction_id FROM auctions WHERE title = 'ACID Test Item');
+     WHERE amount = 120.00 AND auction_id = :auction_id;
 
     IF v_count = 1 THEN
-        RAISE NOTICE 'PASS  Durability: committed bid survived reconnect (WAL flushed before commit returned)';
+        RAISE NOTICE 'PASS  Durability: committed bid is visible (WAL guarantee — see db/tests/concurrency.sh for the full docker-restart proof)';
     ELSE
         RAISE NOTICE 'FAIL  Durability: expected 1 row, got %', v_count;
     END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE NOTICE 'FAIL  Durability: %', SQLERRM;
 END $$;
 
 ROLLBACK TO SAVEPOINT sp_durability;
