@@ -37,3 +37,4 @@ pgdata/
 
 # Docs (kept locally, not pushed to the repo)
 *.md
+!docs/*.md
