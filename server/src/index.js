@@ -16,3 +16,11 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`BidHub API listening on http://localhost:${port}`);
 });
+
+// Batch-close job (CALL close_expired_auctions(), db/03_procedures.sql) is
+// opt-in: a demo walking through a manual close shouldn't race a background
+// timer also closing the same auctions mid-explanation.
+if (process.env.ENABLE_AUCTION_JOB === 'true') {
+  const { startCloseAuctionsJob } = await import('./jobs/closeAuctions.js');
+  startCloseAuctionsJob(Number(process.env.AUCTION_JOB_INTERVAL_MS) || undefined);
+}

@@ -1,0 +1,110 @@
+import { Router } from 'express';
+import { query } from '../db.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errors.js';
+
+const router = Router();
+
+const AUCTION_COLUMNS = `
+  a.auction_id, a.item_id, a.starting_price, a.reserve_price, a.bid_increment,
+  a.start_time, a.end_time, a.status, a.winning_bid_id, a.created_at,
+  i.title AS item_title, i.image_url, i.category_id,
+  COALESCE(hb.high_bid, a.starting_price) AS current_high_bid,
+  COALESCE(bc.bid_count, 0)::INT AS bid_count
+`;
+
+// Both routes below need "current high bid" and "bid count" per auction;
+// kept as one shared FROM/JOIN fragment so the list and detail routes can
+// never quietly drift out of sync with each other.
+const AUCTION_JOINS = `
+  FROM auctions a
+  JOIN items i ON i.item_id = a.item_id
+  LEFT JOIN LATERAL (
+    SELECT MAX(amount) AS high_bid FROM bids WHERE bids.auction_id = a.auction_id
+  ) hb ON true
+  LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS bid_count FROM bids WHERE bids.auction_id = a.auction_id
+  ) bc ON true
+`;
+
+// GET /api/auctions?status=ACTIVE
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { status } = req.query;
+    const params = [];
+    let where = '';
+
+    if (status) {
+      params.push(status);
+      where = `WHERE a.status = $${params.length}`;
+    }
+
+    const result = await query(
+      `SELECT ${AUCTION_COLUMNS} ${AUCTION_JOINS} ${where} ORDER BY a.end_time ASC`,
+      params
+    );
+
+    return res.json({ auctions: result.rows });
+  })
+);
+
+// POST /api/auctions -- seller-only, and only for an item they themselves
+// listed. This ownership check is not a business rule the database already
+// enforces elsewhere (unlike place_bid's validation), so it lives here.
+router.post(
+  '/',
+  requireAuth,
+  requireRole('SELLER'),
+  asyncHandler(async (req, res) => {
+    const { item_id, starting_price, reserve_price, bid_increment, end_time } = req.body || {};
+
+    if (!item_id || !starting_price || !bid_increment || !end_time) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'item_id, starting_price, bid_increment and end_time are required.',
+        },
+      });
+    }
+
+    const owns = await query('SELECT seller_id FROM items WHERE item_id = $1', [item_id]);
+
+    if (!owns.rows[0]) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Item not found.' } });
+    }
+
+    if (owns.rows[0].seller_id !== req.user.user_id) {
+      return res.status(403).json({
+        error: { code: 'AUTH_FORBIDDEN', message: 'You can only auction your own items.' },
+      });
+    }
+
+    const result = await query(
+      `INSERT INTO auctions (item_id, starting_price, reserve_price, bid_increment, end_time, status)
+       VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+       RETURNING auction_id, item_id, starting_price, reserve_price, bid_increment, start_time, end_time, status, created_at`,
+      [item_id, starting_price, reserve_price || null, bid_increment, end_time]
+    );
+
+    return res.status(201).json({ auction: result.rows[0] });
+  })
+);
+
+// GET /api/auctions/:id
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const result = await query(`SELECT ${AUCTION_COLUMNS} ${AUCTION_JOINS} WHERE a.auction_id = $1`, [
+      req.params.id,
+    ]);
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Auction not found.' } });
+    }
+
+    return res.json({ auction: result.rows[0] });
+  })
+);
+
+export default router;

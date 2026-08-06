@@ -3,6 +3,12 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { query } from './db.js';
 import authRouter from './routes/auth.js';
+import categoriesRouter from './routes/categories.js';
+import itemsRouter from './routes/items.js';
+import auctionsRouter from './routes/auctions.js';
+import bidsRouter from './routes/bids.js';
+import notificationsRouter from './routes/notifications.js';
+import analyticsRouter from './routes/analytics.js';
 import { notFoundHandler, errorHandler, asyncHandler } from './middleware/errors.js';
 
 const app = express();
@@ -31,6 +37,15 @@ app.get(
 );
 
 app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/items', itemsRouter);
+app.use('/api/auctions', auctionsRouter);
+// bidsRouter defines its own full paths (/auctions/:id/bids,
+// /auctions/:id/leaderboard, /me/bids) since it straddles two prefixes --
+// mounted at /api directly rather than nested under /auctions.
+app.use('/api', bidsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/analytics', analyticsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
