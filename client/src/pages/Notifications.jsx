@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 
+// notifications.type is one of OUTBID | WON | SOLD | AUCTION_CLOSED
+// (db/01_schema.sql enum) -- mapped onto the existing badge palette rather
+// than inventing new colors per type.
+const TYPE_BADGE = {
+  OUTBID: 'badge-outbid',
+  WON: 'badge-won',
+  SOLD: 'badge-won',
+  AUCTION_CLOSED: 'badge-closed',
+};
+
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +62,7 @@ export default function Notifications() {
       {notifications.map((n) => (
         <div key={n.notification_id} className={`notification-item ${n.is_read ? '' : 'unread'}`}>
           <div>
-            <div className="type">{n.type}</div>
+            <span className={`badge ${TYPE_BADGE[n.type] || 'badge-closed'}`}>{n.type}</span>
             <div>{n.title}</div>
             <div className="page-caption" style={{ margin: 0 }}>
               {n.message}

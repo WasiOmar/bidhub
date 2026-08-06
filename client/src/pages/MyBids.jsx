@@ -6,14 +6,25 @@ function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
 }
 
-function statusFor(bid) {
+// GET /api/me/bids (server/src/routes/bids.js) reports `won` (set once
+// award_winner() stamps winning_bid_id at close) but has no notion of
+// "currently leading a still-open auction" -- that needs each active
+// auction's live current_high_bid, which this page fetches separately
+// per distinct ACTIVE auction in the caller's own bid history, below.
+function statusFor(bid, currentHighByAuction) {
   if (bid.won) return { label: 'Won', className: 'badge-won' };
   if (bid.auction_status === 'CLOSED') return { label: 'Lost', className: 'badge-closed' };
-  return { label: 'Active', className: 'badge-active' };
+
+  const currentHigh = currentHighByAuction.get(bid.auction_id);
+  if (currentHigh !== undefined && Number(bid.amount) < currentHigh) {
+    return { label: 'Outbid', className: 'badge-outbid' };
+  }
+  return { label: 'Leading', className: 'badge-active' };
 }
 
 export default function MyBids() {
   const [bids, setBids] = useState([]);
+  const [currentHighByAuction, setCurrentHighByAuction] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -22,8 +33,17 @@ export default function MyBids() {
 
     api
       .get('/me/bids')
-      .then(({ bids: rows }) => {
-        if (!cancelled) setBids(rows);
+      .then(async ({ bids: rows }) => {
+        if (cancelled) return;
+        setBids(rows);
+
+        const activeAuctionIds = [...new Set(rows.filter((b) => b.auction_status === 'ACTIVE').map((b) => b.auction_id))];
+        const details = await Promise.all(
+          activeAuctionIds.map((auctionId) =>
+            api.get(`/auctions/${auctionId}`).then(({ auction }) => [auctionId, Number(auction.current_high_bid)])
+          )
+        );
+        if (!cancelled) setCurrentHighByAuction(new Map(details));
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -57,7 +77,7 @@ export default function MyBids() {
           </thead>
           <tbody>
             {bids.map((bid) => {
-              const status = statusFor(bid);
+              const status = statusFor(bid, currentHighByAuction);
               return (
                 <tr key={bid.bid_id}>
                   <td>

@@ -1,25 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 
 function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
 }
 
-// Basic tables for now, straight off v_top_bidders and v_seller_revenue
-// (db/04_queries.sql — RANK() and a running-total window function). Charts
-// and the momentum/category-leaderboard views are P3-04's job.
+// Minimal dependency-free horizontal bar chart -- no charting library, just
+// SVG rects scaled to the largest value in the set.
+function BarChart({ rows, labelKey, valueKey }) {
+  const max = Math.max(1, ...rows.map((r) => Number(r[valueKey])));
+  const rowHeight = 28;
+
+  return (
+    <svg width="100%" height={rows.length * rowHeight} role="img" aria-label="bar chart">
+      {rows.map((row, i) => {
+        const widthPct = (Number(row[valueKey]) / max) * 100;
+        return (
+          <g key={row[labelKey] + i} transform={`translate(0, ${i * rowHeight})`}>
+            <text x="0" y="14" fontSize="12" fill="var(--color-text)">
+              {row[labelKey]}
+            </text>
+            <rect x="0" y="18" width={`${widthPct}%`} height="6" rx="3" fill="var(--color-accent)" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function Analytics() {
   const [topBidders, setTopBidders] = useState([]);
+  const [sellerRevenue, setSellerRevenue] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    api
-      .get('/analytics/top-bidders')
-      .then(({ top_bidders }) => {
-        if (!cancelled) setTopBidders(top_bidders);
+    Promise.all([api.get('/analytics/top-bidders'), api.get('/analytics/seller-revenue')])
+      .then(([topBiddersData, revenueData]) => {
+        if (cancelled) return;
+        setTopBidders(topBiddersData.top_bidders);
+        setSellerRevenue(revenueData.seller_revenue);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -33,37 +55,88 @@ export default function Analytics() {
     };
   }, []);
 
+  // v_seller_revenue is one row per transaction; grouped here just for
+  // display (a "latest running total per seller" summary above the full
+  // ledger) -- the running total itself is entirely the view's own
+  // SUM(...) OVER (PARTITION BY seller_id ORDER BY created_at ROWS
+  // UNBOUNDED PRECEDING), not recomputed in JS.
+  const latestPerSeller = useMemo(() => {
+    const bySeller = new Map();
+    for (const row of sellerRevenue) {
+      bySeller.set(row.seller_id, row); // rows arrive in (seller_id, created_at) order, so last write wins
+    }
+    return Array.from(bySeller.values());
+  }, [sellerRevenue]);
+
+  if (loading) return <div className="empty-state">Loading…</div>;
+  if (error) return <div className="form-error">{error}</div>;
+
   return (
     <div>
       <h1 className="page-title">Analytics</h1>
-      <p className="page-caption">Top bidders — RANK() OVER (ORDER BY total_bid_value DESC), v_top_bidders.</p>
 
-      {loading && <div className="empty-state">Loading…</div>}
-      {error && <div className="form-error">{error}</div>}
-      {!loading && !error && topBidders.length === 0 && <div className="empty-state">No bids yet.</div>}
+      <section style={{ marginBottom: 32 }}>
+        <h2>Top bidders</h2>
+        <p className="page-caption">RANK() OVER (ORDER BY total_bid_value DESC) — v_top_bidders</p>
+        {topBidders.length === 0 ? (
+          <div className="empty-state">No bids yet.</div>
+        ) : (
+          <>
+            <BarChart rows={topBidders.slice(0, 10)} labelKey="full_name" valueKey="total_bid_value" />
+            <table style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Bidder</th>
+                  <th>Bids</th>
+                  <th>Total value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topBidders.map((row) => (
+                  <tr key={row.user_id}>
+                    <td>{row.rank}</td>
+                    <td>{row.full_name}</td>
+                    <td>{row.bid_count}</td>
+                    <td>{formatMoney(row.total_bid_value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </section>
 
-      {topBidders.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Bidder</th>
-              <th>Bids</th>
-              <th>Total value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topBidders.map((row) => (
-              <tr key={row.user_id}>
-                <td>{row.rank}</td>
-                <td>{row.full_name}</td>
-                <td>{row.bid_count}</td>
-                <td>{formatMoney(row.total_bid_value)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <section>
+        <h2>Seller revenue</h2>
+        <p className="page-caption">
+          SUM(final_amount) OVER (PARTITION BY seller_id ORDER BY created_at ROWS UNBOUNDED PRECEDING) —
+          v_seller_revenue
+        </p>
+        {latestPerSeller.length === 0 ? (
+          <div className="empty-state">No completed sales yet.</div>
+        ) : (
+          <>
+            <BarChart rows={latestPerSeller} labelKey="seller_name" valueKey="running_revenue" />
+            <table style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Seller</th>
+                  <th>Running revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestPerSeller.map((row) => (
+                  <tr key={row.seller_id}>
+                    <td>{row.seller_name}</td>
+                    <td>{formatMoney(row.running_revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </section>
     </div>
   );
 }
