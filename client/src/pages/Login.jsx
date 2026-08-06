@@ -1,0 +1,63 @@
+import { useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+
+export default function Login() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      const redirectTo = location.state?.from?.pathname || '/';
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Login failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="page-title">Log in</h1>
+      {error && <div className="form-error">{error}</div>}
+      <form className="form" onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>
+          {submitting ? 'Logging in…' : 'Log in'}
+        </button>
+      </form>
+      <p className="page-caption">
+        No account? <Link to="/register">Register</Link>
+      </p>
+    </div>
+  );
+}

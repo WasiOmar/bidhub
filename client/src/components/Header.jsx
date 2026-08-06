@@ -1,0 +1,95 @@
+import { useEffect, useState, useCallback } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+import { api } from '../api/client.js';
+
+const POLL_MS = 30_000;
+
+// The unread count here is the single most visible proof, anywhere in the
+// demo, that notifications are written entirely by database triggers
+// (trg_outbid / trg_close_auction — db/02_triggers.sql) and never by this
+// API: nobody clicked anything to make this number change, a second
+// browser bidding on the same auction did.
+function NotificationBell() {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refresh = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { notifications } = await api.get('/notifications');
+      setUnreadCount(notifications.filter((n) => !n.is_read).length);
+    } catch {
+      // A failed poll shouldn't crash the header — just try again next tick.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      return undefined;
+    }
+    refresh();
+    const timer = setInterval(refresh, POLL_MS);
+    return () => clearInterval(timer);
+  }, [user, refresh]);
+
+  if (!user) return null;
+
+  return (
+    <NavLink to="/notifications" className="bell-button" title={`${unreadCount} unread notifications`}>
+      🔔
+      {unreadCount > 0 && <span className="bell-count">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+    </NavLink>
+  );
+}
+
+export default function Header() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/');
+  }
+
+  return (
+    <header className="app-header">
+      <div className="app-nav">
+        <NavLink to="/" className="app-brand">
+          BidHub
+        </NavLink>
+        <NavLink to="/" end>
+          Home
+        </NavLink>
+        <NavLink to="/browse">Browse</NavLink>
+        <NavLink to="/analytics">Analytics</NavLink>
+        {user && <NavLink to="/my-bids">My Bids</NavLink>}
+        {user?.role === 'SELLER' && <NavLink to="/create-listing">Sell an item</NavLink>}
+      </div>
+
+      <div className="app-nav-right">
+        <NotificationBell />
+        {user ? (
+          <>
+            <span className="page-caption" style={{ margin: 0 }}>
+              {user.full_name}
+            </span>
+            <button className="btn" onClick={handleLogout}>
+              Log out
+            </button>
+          </>
+        ) : (
+          <>
+            <NavLink to="/login" className="btn">
+              Log in
+            </NavLink>
+            <NavLink to="/register" className="btn btn-primary">
+              Register
+            </NavLink>
+          </>
+        )}
+      </div>
+    </header>
+  );
+}

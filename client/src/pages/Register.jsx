@@ -1,0 +1,69 @@
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+
+export default function Register() {
+  const { register } = useAuth();
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'BUYER' });
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  function update(field) {
+    return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await register(form);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err.message || 'Registration failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="page-title">Register</h1>
+      {error && <div className="form-error">{error}</div>}
+      <form className="form" onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="full_name">Full name</label>
+          <input id="full_name" value={form.full_name} onChange={update('full_name')} required />
+        </div>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input id="email" type="email" value={form.email} onChange={update('email')} required />
+        </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            value={form.password}
+            onChange={update('password')}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="role">I want to</label>
+          <select id="role" value={form.role} onChange={update('role')}>
+            <option value="BUYER">Bid on items (Buyer)</option>
+            <option value="SELLER">List items for auction (Seller)</option>
+          </select>
+        </div>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Register'}
+        </button>
+      </form>
+      <p className="page-caption">
+        Already have an account? <Link to="/login">Log in</Link>
+      </p>
+    </div>
+  );
+}

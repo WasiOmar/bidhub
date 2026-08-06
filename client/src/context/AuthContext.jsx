@@ -1,0 +1,88 @@
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { api, getToken, setToken as persistToken, ApiError } from '../api/client.js';
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // On first load, if a token is already in localStorage, validate it
+  // against GET /api/auth/me rather than trusting it blindly — an expired
+  // or tampered token should drop the user back to logged-out, not show a
+  // stale "logged in" header that then fails on the first real request.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrap() {
+      if (!getToken()) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const { user: me } = await api.get('/auth/me');
+        if (!cancelled) setUser(me);
+      } catch {
+        persistToken(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const login = useCallback(async (email, password) => {
+    const { user: loggedInUser, token } = await api.post('/auth/login', { email, password });
+    persistToken(token);
+    setUser(loggedInUser);
+    return loggedInUser;
+  }, []);
+
+  const register = useCallback(async ({ full_name, email, password, role }) => {
+    const { user: newUser, token } = await api.post('/auth/register', { full_name, email, password, role });
+    persistToken(token);
+    setUser(newUser);
+    return newUser;
+  }, []);
+
+  const logout = useCallback(() => {
+    persistToken(null);
+    setUser(null);
+  }, []);
+
+  const value = { user, loading, login, register, logout };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error('useAuth must be used inside <AuthProvider>');
+  }
+  return ctx;
+}
+
+// Route wrapper: redirects to /login when logged out, preserving where the
+// user was headed so login can send them back afterward.
+export function RequireAuth({ children }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <div className="empty-state">Loading…</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return children;
+}
+
+export { ApiError };
