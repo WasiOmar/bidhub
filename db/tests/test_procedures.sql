@@ -1,8 +1,9 @@
 -- =============================================================================
 -- db/tests/test_procedures.sql
--- Exercises place_bid() (db/03_procedures.sql): first-bid floor, the AU001/
--- AU002/AU003 validation paths, and the proof that a successful call also
--- fires the P1 triggers (one bids row AND one audit_log row per bid).
+-- Exercises db/03_procedures.sql: place_bid()'s first-bid floor, the AU001/
+-- AU002/AU003 validation paths, the proof that a successful call also fires
+-- the P1 triggers (one bids row AND one audit_log row per bid), and the
+-- explicit-cursor batch close (close_expired_auctions() + award_winner()).
 -- Owner: Person 2 (Procedural SQL & Performance)
 --
 -- Run:  psql "$DATABASE_URL" -f db/tests/test_procedures.sql
@@ -183,8 +184,97 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
+-- Test 6 — close_expired_auctions(): the explicit-cursor batch close.
+-- Seeds two expired ACTIVE auctions (with bids) and one still-live ACTIVE
+-- auction, then asserts: exactly the two expired ones flip to CLOSED, the
+-- live one is untouched, exactly two transactions rows exist (one per
+-- closed auction — trg_close_auction's job), and award_winner() stamped
+-- winning_bid_id on both.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_seller_id     INT;
+    v_bidder1_id    INT;
+    v_bidder2_id    INT;
+    v_auction_a     INT;
+    v_auction_b     INT;
+    v_auction_c     INT;
+    v_closed_count  INT;
+    v_live_status   auction_status;
+    v_txn_count     INT;
+    v_award_a       INT;
+    v_award_b       INT;
+BEGIN
+    SELECT user_id INTO v_seller_id  FROM users WHERE email = 'proc-seller@bidhub.local';
+    SELECT user_id INTO v_bidder1_id FROM users WHERE email = 'proc-bidder1@bidhub.local';
+    SELECT user_id INTO v_bidder2_id FROM users WHERE email = 'proc-bidder2@bidhub.local';
+
+    INSERT INTO items (seller_id, category_id, title)
+    SELECT v_seller_id, c.category_id, t.title
+    FROM categories c,
+         (VALUES
+            ('Cursor Test Item A'),
+            ('Cursor Test Item B'),
+            ('Cursor Test Item C')
+         ) AS t(title)
+    WHERE c.slug = 'proc-test-category';
+
+    -- Two expired auctions, still marked ACTIVE — as if the batch job simply
+    -- hasn't run yet. Exactly what close_expired_auctions() should pick up.
+    INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
+    SELECT item_id, 100.00, 10.00, now() - interval '1 hour', 'ACTIVE'
+    FROM items WHERE title = 'Cursor Test Item A'
+    RETURNING auction_id INTO v_auction_a;
+
+    INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
+    SELECT item_id, 200.00, 20.00, now() - interval '2 hours', 'ACTIVE'
+    FROM items WHERE title = 'Cursor Test Item B'
+    RETURNING auction_id INTO v_auction_b;
+
+    -- One still-live auction — must be left completely untouched.
+    INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
+    SELECT item_id, 50.00, 5.00, now() + interval '1 day', 'ACTIVE'
+    FROM items WHERE title = 'Cursor Test Item C'
+    RETURNING auction_id INTO v_auction_c;
+
+    -- Seed bids directly: place_bid() would reject these auctions outright
+    -- (AU002 — already past end_time), which is exactly the stale state
+    -- close_expired_auctions() exists to clean up.
+    INSERT INTO bids (auction_id, bidder_id, amount) VALUES (v_auction_a, v_bidder1_id, 120.00);
+    INSERT INTO bids (auction_id, bidder_id, amount) VALUES (v_auction_a, v_bidder2_id, 130.00);
+    INSERT INTO bids (auction_id, bidder_id, amount) VALUES (v_auction_b, v_bidder1_id, 250.00);
+
+    CALL close_expired_auctions();
+
+    SELECT count(*) INTO v_closed_count
+    FROM auctions
+    WHERE auction_id IN (v_auction_a, v_auction_b) AND status = 'CLOSED';
+
+    SELECT status INTO v_live_status FROM auctions WHERE auction_id = v_auction_c;
+
+    SELECT count(*) INTO v_txn_count
+    FROM transactions
+    WHERE auction_id IN (v_auction_a, v_auction_b);
+
+    SELECT winning_bid_id INTO v_award_a FROM auctions WHERE auction_id = v_auction_a;
+    SELECT winning_bid_id INTO v_award_b FROM auctions WHERE auction_id = v_auction_b;
+
+    IF v_closed_count = 2
+       AND v_live_status = 'ACTIVE'
+       AND v_txn_count = 2
+       AND v_award_a IS NOT NULL
+       AND v_award_b IS NOT NULL
+    THEN
+        RAISE NOTICE 'PASS  close_expired_auctions closed exactly 2 expired auctions, left the live one ACTIVE, wrote 2 transactions, and award_winner populated winning_bid_id on both';
+    ELSE
+        RAISE NOTICE 'FAIL  test_close_expired_auctions: closed_count=% (want 2), live_status=% (want ACTIVE), txn_count=% (want 2), award_a=%, award_b=%',
+            v_closed_count, v_live_status, v_txn_count, v_award_a, v_award_b;
+    END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
 -- No residue: undo every fixture.
 -- ---------------------------------------------------------------------------
 ROLLBACK;
 
-SELECT 'test_procedures.sql: place_bid validation and trigger side-effects exercised — verify every line above says PASS' AS result;
+SELECT 'test_procedures.sql: place_bid validation, trigger side-effects, and cursor-driven batch close all exercised — verify every line above says PASS' AS result;
