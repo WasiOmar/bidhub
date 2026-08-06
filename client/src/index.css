@@ -1,0 +1,395 @@
+/* =============================================================================
+   BidHub — single global stylesheet.
+   Deliberately neutral: this is a general-purpose auction platform (electronics,
+   art, vehicles, instruments, books — see db/07_seed.sql), not a luxury-goods
+   storefront, so no gold/black premium styling. Plain, legible, works for any
+   category of item.
+   ============================================================================= */
+
+:root {
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-border: #e2e4e8;
+  --color-text: #1a1c20;
+  --color-text-muted: #62666f;
+  --color-accent: #2f5fda;
+  --color-accent-hover: #2549ad;
+  --color-success: #1a7f4b;
+  --color-danger: #c0362c;
+  --color-warning: #a5680c;
+
+  --radius: 8px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 40px;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* --- Layout ---------------------------------------------------------------- */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.page-title {
+  margin: 0 0 var(--spacing-md);
+  font-size: 1.5rem;
+}
+
+.page-caption {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: -8px 0 var(--spacing-md);
+}
+
+/* --- Header / nav ------------------------------------------------------------ */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-brand {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--color-text);
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.app-nav a {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+.app-nav a.active,
+.app-nav a:hover {
+  color: var(--color-text);
+}
+
+.app-nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* --- Notification bell ------------------------------------------------------- */
+
+.bell-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+.bell-button:hover {
+  background: var(--color-bg);
+}
+
+.bell-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* --- Buttons ----------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.btn:hover {
+  background: var(--color-bg);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+/* --- Forms --------------------------------------------------------------------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-width: 420px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.field-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+.field-row .field {
+  flex: 1;
+}
+
+.form-error {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius);
+  background: #fbe9e7;
+  color: var(--color-danger);
+  font-size: 0.9rem;
+}
+
+/* --- Cards / grid -------------------------------------------------------------- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.auction-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+.auction-card .title {
+  font-weight: 600;
+}
+.auction-card .price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.auction-card .meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* --- Two-column layout (Browse: sidebar + grid) --------------------------------- */
+
+.two-col {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.category-tree ul {
+  list-style: none;
+  margin: 0;
+  padding-left: var(--spacing-md);
+}
+.category-tree > ul {
+  padding-left: 0;
+}
+.category-tree button {
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 2px 0;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.category-tree button:hover {
+  color: var(--color-accent);
+}
+.category-tree .count {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+/* --- Tables (leaderboard, analytics, bids) --------------------------------------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+th,
+td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+th {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+tr.leading {
+  background: #eef3ff;
+  font-weight: 700;
+}
+
+/* --- Badges / status ------------------------------------------------------------- */
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.badge-active {
+  background: #e4f6ec;
+  color: var(--color-success);
+}
+.badge-closed {
+  background: #eceef1;
+  color: var(--color-text-muted);
+}
+.badge-outbid {
+  background: #fdeee5;
+  color: var(--color-warning);
+}
+.badge-won {
+  background: #e4f6ec;
+  color: var(--color-success);
+}
+
+.notification-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.notification-item.unread {
+  font-weight: 600;
+}
+.notification-item .type {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.empty-state {
+  color: var(--color-text-muted);
+  padding: var(--spacing-lg);
+  text-align: center;
+}
