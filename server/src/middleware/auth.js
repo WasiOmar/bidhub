@@ -1,34 +1,1 @@
-import jwt from 'jsonwebtoken';
-
-export function requireAuth(req, res, next) {
-  const header = req.headers.authorization || '';
-  const [scheme, token] = header.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
-    return res
-      .status(401)
-      .json({ error: { code: 'AUTH_REQUIRED', message: 'Missing or invalid Authorization header' } });
-  }
-
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { user_id: payload.sub, email: payload.email, role: payload.role };
-    return next();
-  } catch {
-    return res.status(401).json({ error: { code: 'AUTH_INVALID', message: 'Invalid or expired token' } });
-  }
-}
-
-export function requireRole(role) {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Authentication required' } });
-    }
-    if (req.user.role !== role) {
-      return res
-        .status(403)
-        .json({ error: { code: 'AUTH_FORBIDDEN', message: `Requires ${role} role` } });
-    }
-    return next();
-  };
-}
+import jwt from 'jsonwebtoken';export function requireAuth(req, res, next) {  const header = req.headers.authorization || '';  const [scheme, token] = header.split(' ');  if (scheme !== 'Bearer' || !token) {    return res      .status(401)      .json({ error: { code: 'AUTH_REQUIRED', message: 'Missing or invalid Authorization header' } });  }  try {    const payload = jwt.verify(token, process.env.JWT_SECRET);    req.user = { user_id: payload.sub, email: payload.email, role: payload.role };    return next();  } catch {    return res.status(401).json({ error: { code: 'AUTH_INVALID', message: 'Invalid or expired token' } });  }}export function requireRole(role) {  return (req, res, next) => {    if (!req.user) {      return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Authentication required' } });    }    if (req.user.role !== role) {      return res        .status(403)        .json({ error: { code: 'AUTH_FORBIDDEN', message: `Requires ${role} role` } });    }    return next();  };}

@@ -1,99 +1,1 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api } from '../api/client.js';
-
-function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
-}
-
-// GET /api/me/bids (server/src/routes/bids.js) reports `won` (set once
-// award_winner() stamps winning_bid_id at close) but has no notion of
-// "currently leading a still-open auction" -- that needs each active
-// auction's live current_high_bid, which this page fetches separately
-// per distinct ACTIVE auction in the caller's own bid history, below.
-function statusFor(bid, currentHighByAuction) {
-  if (bid.won) return { label: 'Won', className: 'badge-won' };
-  if (bid.auction_status === 'CLOSED') return { label: 'Lost', className: 'badge-closed' };
-
-  const currentHigh = currentHighByAuction.get(bid.auction_id);
-  if (currentHigh !== undefined && Number(bid.amount) < currentHigh) {
-    return { label: 'Outbid', className: 'badge-outbid' };
-  }
-  return { label: 'Leading', className: 'badge-active' };
-}
-
-export default function MyBids() {
-  const [bids, setBids] = useState([]);
-  const [currentHighByAuction, setCurrentHighByAuction] = useState(new Map());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    api
-      .get('/me/bids')
-      .then(async ({ bids: rows }) => {
-        if (cancelled) return;
-        setBids(rows);
-
-        const activeAuctionIds = [...new Set(rows.filter((b) => b.auction_status === 'ACTIVE').map((b) => b.auction_id))];
-        const details = await Promise.all(
-          activeAuctionIds.map((auctionId) =>
-            api.get(`/auctions/${auctionId}`).then(({ auction }) => [auctionId, Number(auction.current_high_bid)])
-          )
-        );
-        if (!cancelled) setCurrentHighByAuction(new Map(details));
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return (
-    <div>
-      <h1 className="page-title">My bids</h1>
-
-      {loading && <div className="empty-state">Loading…</div>}
-      {error && <div className="form-error">{error}</div>}
-      {!loading && !error && bids.length === 0 && <div className="empty-state">You haven't bid on anything yet.</div>}
-
-      {bids.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Your bid</th>
-              <th>Status</th>
-              <th>Placed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bids.map((bid) => {
-              const status = statusFor(bid, currentHighByAuction);
-              return (
-                <tr key={bid.bid_id}>
-                  <td>
-                    <Link to={`/auctions/${bid.auction_id}`}>{bid.item_title}</Link>
-                  </td>
-                  <td>{formatMoney(bid.amount)}</td>
-                  <td>
-                    <span className={`badge ${status.className}`}>{status.label}</span>
-                  </td>
-                  <td>{new Date(bid.placed_at).toLocaleString()}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
+import { useEffect, useState } from 'react';import { Link } from 'react-router-dom';import { api } from '../api/client.js';function formatMoney(amount) {  return `$${Number(amount).toFixed(2)}`;}function statusFor(bid, currentHighByAuction) {  if (bid.won) return { label: 'Won', className: 'badge-won' };  if (bid.auction_status === 'CLOSED') return { label: 'Lost', className: 'badge-closed' };  const currentHigh = currentHighByAuction.get(bid.auction_id);  if (currentHigh !== undefined && Number(bid.amount) < currentHigh) {    return { label: 'Outbid', className: 'badge-outbid' };  }  return { label: 'Leading', className: 'badge-active' };}export default function MyBids() {  const [bids, setBids] = useState([]);  const [currentHighByAuction, setCurrentHighByAuction] = useState(new Map());  const [loading, setLoading] = useState(true);  const [error, setError] = useState(null);  useEffect(() => {    let cancelled = false;    api      .get('/me/bids')      .then(async ({ bids: rows }) => {        if (cancelled) return;        setBids(rows);        const activeAuctionIds = [...new Set(rows.filter((b) => b.auction_status === 'ACTIVE').map((b) => b.auction_id))];        const details = await Promise.all(          activeAuctionIds.map((auctionId) =>            api.get(`/auctions/${auctionId}`).then(({ auction }) => [auctionId, Number(auction.current_high_bid)])          )        );        if (!cancelled) setCurrentHighByAuction(new Map(details));      })      .catch((err) => {        if (!cancelled) setError(err.message);      })      .finally(() => {        if (!cancelled) setLoading(false);      });    return () => {      cancelled = true;    };  }, []);  return (    <div>      <h1 className="page-title">My bids</h1>      {loading && <div className="empty-state">Loading…</div>}      {error && <div className="form-error">{error}</div>}      {!loading && !error && bids.length === 0 && <div className="empty-state">You haven't bid on anything yet.</div>}      {bids.length > 0 && (        <table>          <thead>            <tr>              <th>Item</th>              <th>Your bid</th>              <th>Status</th>              <th>Placed</th>            </tr>          </thead>          <tbody>            {bids.map((bid) => {              const status = statusFor(bid, currentHighByAuction);              return (                <tr key={bid.bid_id}>                  <td>                    <Link to={`/auctions/${bid.auction_id}`}>{bid.item_title}</Link>                  </td>                  <td>{formatMoney(bid.amount)}</td>                  <td>                    <span className={`badge ${status.className}`}>{status.label}</span>                  </td>                  <td>{new Date(bid.placed_at).toLocaleString()}</td>                </tr>              );            })}          </tbody>        </table>      )}    </div>  );}
