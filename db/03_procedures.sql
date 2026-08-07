@@ -44,11 +44,6 @@ BEGIN
         RAISE EXCEPTION 'seller % cannot bid on their own auction %', p_user_id, p_auction_id
             USING ERRCODE = 'AU003';
     END IF;
-
-    
-    
-    
-    
     
     v_max_amount := COALESCE(
         (SELECT MAX(b.amount) FROM bids b WHERE b.auction_id = p_auction_id),
@@ -75,22 +70,6 @@ COMMENT ON PROCEDURE place_bid(INT, INT, NUMERIC) IS
     'writes are left entirely to trg_outbid / trg_audit_bid (db/02_triggers.sql).';
 
 DROP PROCEDURE IF EXISTS award_winner(INT);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 CREATE PROCEDURE award_winner(p_auction_id INT)
 LANGUAGE plpgsql
@@ -145,23 +124,10 @@ COMMENT ON PROCEDURE award_winner(INT) IS
 
 DROP PROCEDURE IF EXISTS close_expired_auctions();
 
-
-
-
-
-
-
-
-
 CREATE PROCEDURE close_expired_auctions()
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    
-    
-    
-    
-    
     
     cur_expired CURSOR FOR
         SELECT auction_id, item_id
@@ -179,17 +145,7 @@ BEGIN
         
         FETCH cur_expired INTO rec;
         EXIT WHEN NOT FOUND;
-
-        
-        
-        
-        
-        
-        
-        UPDATE auctions SET status = 'CLOSED' WHERE CURRENT OF cur_expired;
-
-        
-        
+        UPDATE auctions SET status = 'CLOSED' WHERE CURRENT OF cur_expired;     
         CALL award_winner(rec.auction_id);
 
         v_count := v_count + 1;
