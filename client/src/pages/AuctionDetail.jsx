@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 import { api, ApiError } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
@@ -62,6 +63,7 @@ function AttributesTable({ attributes }) {
 
 function BidPanel({ auction, sellerId, onBidPlaced }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [amount, setAmount] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -84,6 +86,7 @@ function BidPanel({ auction, sellerId, onBidPlaced }) {
     setSubmitting(true);
     try {
       await api.post(`/auctions/${auction.auction_id}/bids`, { amount: Number(amount) });
+      showToast(`Bid of ${formatMoney(amount)} placed.`);
       onBidPlaced();
     } catch (err) {
       

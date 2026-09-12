@@ -3,6 +3,7 @@ import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 
 const TYPE_TONE = {
   OUTBID: 'outbid',
@@ -12,6 +13,7 @@ const TYPE_TONE = {
 };
 
 export default function Notifications() {
+  const { showToast } = useToast();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,8 +42,9 @@ export default function Notifications() {
     try {
       await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
+      showToast('Marked as read.');
     } catch {
-      
+      showToast('Could not mark as read.', { tone: 'error' });
     }
   }
 

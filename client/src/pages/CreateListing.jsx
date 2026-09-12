@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
+import { useToast } from '../context/ToastContext.jsx';
 
 
 
@@ -19,6 +20,7 @@ const CONDITIONS = ['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED'];
 
 export default function CreateListing() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({
     category_id: '',
@@ -122,6 +124,7 @@ export default function CreateListing() {
         end_time: new Date(form.end_time).toISOString(),
       });
 
+      showToast('Listing published.');
       navigate(`/auctions/${auction.auction_id}`);
     } catch (err) {
       setError(err.message || 'Could not create the listing.');
