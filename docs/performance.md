@@ -1,4 +1,4 @@
-# Performance evidence — indexes (technique 09)
+# Performance evidence — indexes (technique 09) and materialized view (technique 10)
 
 Every number on this page comes from a real run of
 [`db/tests/benchmark.sql`](../db/tests/benchmark.sql). Nothing is estimated. The
@@ -147,7 +147,8 @@ measurements point at them:
 2. **The homepage re-aggregates bids on every poll.** Q1 runs two `LATERAL`
    subqueries per live auction. With the composite index that's fine at this
    scale (17–35 ms for 515 auctions). `mv_leaderboard` (P2-05, `db/06_views.sql`)
-   is the precomputed alternative.
+   is the precomputed alternative. See
+   [Plain view vs materialized view](#plain-view-vs-materialized-view-technique-10).
 
 <details>
 <summary><b>Full EXPLAIN (ANALYZE, BUFFERS) — the four headline queries, run 1</b></summary>
@@ -369,5 +370,167 @@ Sort  (cost=106.77..107.94 rows=467 width=16) (actual time=0.018..0.021 rows=49 
 Planning Time: 0.027 ms
 Execution Time: 0.030 ms
 ```
+
+</details>
+
+---
+
+## Plain view vs materialized view (technique 10)
+
+Measured by section 9 of `db/tests/benchmark.sql`, on the same synthetic data
+(5,040 auctions, 50,446 bids) with the indexes from `05_indexes.sql` in place.
+In [`db/06_views.sql`](../db/06_views.sql), `mv_leaderboard` is defined as
+`SELECT * FROM v_auction_summary`, so both sides run **the same query**. The plain
+view recomputes it on every read. The materialized view returns the result
+stored at its last `REFRESH`. `db/tests/test_views.sql` asserts that the two are
+identical right after a refresh.
+
+| Read | Plain view `v_auction_summary` (ms) | Materialized `mv_leaderboard` (ms) | Speedup | Buffers plain → matview |
+|---|---:|---:|---:|---:|
+| Full report: all 5,040 auctions | 104.910 | 0.578 | **181.5×** | 3,021 → 128 |
+| Live auctions page: `WHERE status = 'ACTIVE' ORDER BY end_time` (515 rows) | 74.263 | 0.865 | **85.9×** | 4,355 → 128 |
+| One auction by id (live auction page) | 0.196 | 0.008 | 24.5× | 21 → 3 |
+| *Reference:* lean plain view `v_active_auctions` (fewer columns, one `LATERAL` probe per auction) | 23.208 | — | — | 2,194 |
+
+The other side of the trade-off is what a refresh costs. These are medians of 3,
+measured with nothing changed between refreshes:
+
+| Refresh | Time (ms) | Lock held | Readers during refresh |
+|---|---:|---|---|
+| `REFRESH MATERIALIZED VIEW` | 135.118 | `ACCESS EXCLUSIVE` | blocked until it finishes |
+| `REFRESH MATERIALIZED VIEW CONCURRENTLY` | 141.593 | `EXCLUSIVE` | keep reading the old snapshot |
+
+`mv_leaderboard` holds 5,040 rows in 1,168 kB, including `uq_mv_leaderboard_auction`.
+
+### What this shows
+
+- **The plain view pays for the whole computation on every read:** a
+  `WindowAgg` computing `ROW_NUMBER()` over all 50,446 bids, a `GroupAggregate`
+  for `COUNT(DISTINCT bidder_id)`, and five joins. The materialized view's read
+  is a 128-page scan of rows that are already finished (plans below).
+- **Break-even is about 1–2 reads per refresh.** One refresh costs about as
+  much as 1.3 full-report reads (135 / 104.9) or 1.8 live-page reads
+  (135 / 74.3). A page polled every 5 seconds by even one viewer makes 12 reads a
+  minute. Refreshed once a minute, the materialized view does one refresh's work
+  where the plain view would recompute 12 times, and every additional viewer
+  widens the gap.
+- **For a single row the plain view is already fast.** PostgreSQL pushes
+  `auction_id = N` down into the view's CTEs (it's the `ROW_NUMBER()` partition
+  key and the `GROUP BY` key), and `idx_bids_auction_amount` serves it: 21 buffers,
+  not the 1,072 pages of `bids`. The materialized view pays off on
+  **multi-row** reads such as reports and grids, not on point lookups.
+- **The price is freshness.** `mv_leaderboard` is as current as its last
+  refresh. It's refreshed by every run of `close_expired_auctions()` (the close
+  job) and by `CALL refresh_leaderboard()`. Check 5 of `test_views.sql` shows
+  it: a new bid appears in the plain views at once, and in `mv_leaderboard` only
+  after the refresh. Anything that must be current (a bidder's own confirmation,
+  `place_bid()`'s floor) reads the base tables, never the snapshot.
+- **`CONCURRENTLY` is slightly slower** because it diffs the new result against
+  the old one by the unique key. In exchange, readers are never blocked.
+  Without `uq_mv_leaderboard_auction`, PostgreSQL refuses it outright with
+  `SQLSTATE 55000` (check 6 of `test_views.sql`). The diff work grows with the
+  number of rows that changed since the last refresh.
+
+Today the API reads neither view: the homepage runs its own query (Q1 above).
+Pointing the homepage and the live-auction report at `mv_leaderboard` would be a
+P3 change in `server/`.
+
+<details>
+<summary><b>EXPLAIN (ANALYZE, BUFFERS) — full report, plain view vs materialized view</b></summary>
+
+Captured in one extra execution after the timed runs. This plain-view run took
+74.0 ms against the 104.9 ms median, which is the same run-to-run noise noted
+above.
+
+**Plain view `SELECT * FROM v_auction_summary`**
+```
+Nested Loop  (cost=5849.73..11801.81 rows=5040 width=145) (actual time=39.958..73.716 rows=5040 loops=1)
+  Buffers: shared hit=3021
+  ->  Hash Left Join  (cost=5849.44..11488.57 rows=5040 width=119) (actual time=39.917..69.092 rows=5040 loops=1)
+        Hash Cond: (a.auction_id = bs.auction_id)
+        Buffers: shared hit=2406
+        ->  Hash Join  (cost=757.44..6383.32 rows=5040 width=103) (actual time=6.360..34.555 rows=5040 loops=1)
+              Hash Cond: (i.category_id = c.category_id)
+              Buffers: shared hit=1334
+              ->  Hash Right Join  (cost=660.18..6272.81 rows=5040 width=83) (actual time=5.583..32.247 rows=5040 loops=1)
+                    Hash Cond: (lb.auction_id = a.auction_id)
+                    Buffers: shared hit=1303
+                    ->  Hash Left Join  (cost=70.38..5679.55 rows=252 width=24) (actual time=1.621..27.071 rows=535 loops=1)
+                          Hash Cond: (lb.bidder_id = hb.user_id)
+                          Buffers: shared hit=1096
+                          ->  Subquery Scan on lb  (cost=0.93..5609.44 rows=252 width=13) (actual time=0.035..25.220 rows=535 loops=1)
+                                Filter: (lb."position" = 1)
+                                Buffers: shared hit=1072
+                                ->  WindowAgg  (cost=0.93..4978.86 rows=50446 width=29) (actual time=0.034..25.132 rows=535 loops=1)
+                                      Run Condition: (row_number() OVER (?) <= 1)
+                                      Buffers: shared hit=1072
+                                      ->  Incremental Sort  (cost=0.93..3969.94 rows=50446 width=21) (actual time=0.028..21.134 rows=50446 loops=1)
+                                            Sort Key: b.auction_id, b.amount DESC, b.placed_at
+                                            Presorted Key: b.auction_id, b.amount
+                                            Full-sort Groups: 1577  Sort Method: quicksort  Average Memory: 26kB  Peak Memory: 26kB
+                                            Buffers: shared hit=1072
+                                            ->  Index Scan using idx_bids_auction_amount on bids b  (cost=0.29..2400.61 rows=50446 width=21) (actual time=0.008..8.854 rows=50446 loops=1)
+                                                  Buffers: shared hit=1072
+                          ->  Hash  (cost=44.20..44.20 rows=2020 width=19) (actual time=1.579..1.580 rows=2020 loops=1)
+                                Buckets: 2048  Batches: 1  Memory Usage: 119kB
+                                Buffers: shared hit=24
+                                ->  Seq Scan on users hb  (cost=0.00..44.20 rows=2020 width=19) (actual time=0.008..0.685 rows=2020 loops=1)
+                                      Buffers: shared hit=24
+                    ->  Hash  (cost=526.79..526.79 rows=5040 width=63) (actual time=3.955..3.957 rows=5040 loops=1)
+                          Buckets: 8192  Batches: 1  Memory Usage: 568kB
+                          Buffers: shared hit=207
+                          ->  Merge Join  (cost=0.61..526.79 rows=5040 width=63) (actual time=0.014..2.972 rows=5040 loops=1)
+                                Merge Cond: (a.item_id = i.item_id)
+                                Buffers: shared hit=207
+                                ->  Index Scan using uq_auctions_item on auctions a  (cost=0.28..200.88 rows=5040 width=25) (actual time=0.006..0.717 rows=5040 loops=1)
+                                      Buffers: shared hit=73
+                                ->  Index Scan using items_pkey on items i  (cost=0.29..2485.19 rows=50060 width=46) (actual time=0.004..0.688 rows=5060 loops=1)
+                                      Buffers: shared hit=134
+              ->  Hash  (cost=60.45..60.45 rows=2945 width=28) (actual time=0.771..0.772 rows=2945 loops=1)
+                    Buckets: 4096  Batches: 1  Memory Usage: 215kB
+                    Buffers: shared hit=31
+                    ->  Seq Scan on categories c  (cost=0.00..60.45 rows=2945 width=28) (actual time=0.009..0.335 rows=2945 loops=1)
+                          Buffers: shared hit=31
+        ->  Hash  (cost=5085.32..5085.32 rows=535 width=20) (actual time=33.549..33.551 rows=535 loops=1)
+              Buckets: 1024  Batches: 1  Memory Usage: 36kB
+              Buffers: shared hit=1072
+              ->  Subquery Scan on bs  (cost=7.87..5085.32 rows=535 width=20) (actual time=0.036..33.425 rows=535 loops=1)
+                    Buffers: shared hit=1072
+                    ->  GroupAggregate  (cost=7.87..5079.97 rows=535 width=20) (actual time=0.035..33.340 rows=535 loops=1)
+                          Group Key: bids.auction_id
+                          Buffers: shared hit=1072
+                          ->  Incremental Sort  (cost=7.87..4696.27 rows=50446 width=8) (actual time=0.026..27.117 rows=50446 loops=1)
+                                Sort Key: bids.auction_id, bids.bidder_id
+                                Presorted Key: bids.auction_id
+                                Full-sort Groups: 511  Sort Method: quicksort  Average Memory: 26kB  Peak Memory: 26kB
+                                Pre-sorted Groups: 501  Sort Method: quicksort  Average Memory: 25kB  Peak Memory: 25kB
+                                Buffers: shared hit=1072
+                                ->  Index Scan using idx_bids_auction_amount on bids  (cost=0.29..2400.61 rows=50446 width=8) (actual time=0.005..8.461 rows=50446 loops=1)
+                                      Buffers: shared hit=1072
+  ->  Memoize  (cost=0.29..0.31 rows=1 width=19) (actual time=0.000..0.000 rows=1 loops=5040)
+        Cache Key: i.seller_id
+        Cache Mode: logical
+        Hits: 4835  Misses: 205  Evictions: 0  Overflows: 0  Memory Usage: 25kB
+        Buffers: shared hit=615
+        ->  Index Scan using users_pkey on users s  (cost=0.28..0.30 rows=1 width=19) (actual time=0.001..0.001 rows=1 loops=205)
+              Index Cond: (user_id = i.seller_id)
+              Buffers: shared hit=615
+Planning:
+  Buffers: shared hit=45
+Planning Time: 2.212 ms
+Execution Time: 74.043 ms
+```
+
+**Materialized view `SELECT * FROM mv_leaderboard`**
+```
+Seq Scan on mv_leaderboard  (cost=0.00..178.40 rows=5040 width=131) (actual time=0.001..0.328 rows=5040 loops=1)
+  Buffers: shared hit=128
+Planning Time: 0.012 ms
+Execution Time: 0.524 ms
+```
+
+Note that the composite index from 05 helps even the plain view: it feeds the
+window function bids already ordered by `(auction_id, amount DESC)`, so only an
+*incremental* sort on `placed_at` is left.
 
 </details>

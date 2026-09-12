@@ -4,7 +4,9 @@
 -- Evidence for technique 09 (and every other index in db/05_indexes.sql):
 -- EXPLAIN (ANALYZE, BUFFERS) of the platform's real hot queries, first with
 -- none of the secondary indexes, then with exactly the definitions from
--- db/05_indexes.sql. The numbers in docs/performance.md come from this script.
+-- db/05_indexes.sql. Section 9 adds technique 10: the same report read from a
+-- plain view and from the materialized view (db/06_views.sql).
+-- The numbers in docs/performance.md come from this script.
 --
 --   psql "$DATABASE_URL" -f db/tests/benchmark.sql
 --
@@ -28,7 +30,10 @@
 --      shared_buffers, then the median of 3 EXPLAIN (ANALYZE, BUFFERS) runs.
 --   4. \ir ../05_indexes.sql — the real file, so what is measured is what ships.
 --   5. Time every query again, print the comparison and the index sizes.
---   6. ROLLBACK.
+--   6. Technique 10, if db/06_views.sql is loaded: time the same report read
+--      from the plain view v_auction_summary and from the materialized view
+--      mv_leaderboard, and time both kinds of REFRESH.
+--   7. ROLLBACK.
 -- =============================================================================
 
 \set ON_ERROR_STOP on
@@ -219,7 +224,8 @@ CREATE TEMP TABLE bench_query (
     source    TEXT NOT NULL,     -- where the platform runs this query
     serves    TEXT NOT NULL,     -- index(es) expected to help
     key_query BOOLEAN NOT NULL,  -- one of the four headline queries (full plans printed)
-    sql       TEXT NOT NULL
+    sql       TEXT NOT NULL,
+    suite     TEXT NOT NULL DEFAULT 'index'   -- 'index' (05_indexes.sql) | 'views' (06_views.sql)
 ) ON COMMIT DROP;
 
 INSERT INTO bench_query VALUES
@@ -334,7 +340,7 @@ CREATE TEMP TABLE bench_result (
     plan_text    TEXT
 ) ON COMMIT DROP;
 
-CREATE FUNCTION pg_temp.bench_run(p_phase TEXT, p_runs INT DEFAULT 3)
+CREATE FUNCTION pg_temp.bench_run(p_phase TEXT, p_suite TEXT DEFAULT 'index', p_runs INT DEFAULT 3)
 RETURNS void
 LANGUAGE plpgsql
 AS $$
@@ -345,7 +351,7 @@ DECLARE
     v_times  NUMERIC[];
     v_text   TEXT;
 BEGIN
-    FOR q IN SELECT * FROM bench_query ORDER BY id LOOP
+    FOR q IN SELECT * FROM bench_query WHERE suite = p_suite ORDER BY id LOOP
         EXECUTE q.sql;                                   -- warm-up, result discarded
 
         v_times := '{}';
@@ -467,6 +473,92 @@ SELECT format(E'---- Q%s %s — %s ----\n%s', q.id, q.label, upper(r.phase), r.p
  ORDER BY q.id, r.phase DESC;
 \pset tuples_only off
 \pset format aligned
+
+
+-- -----------------------------------------------------------------------------
+-- 9. Technique 10: plain view vs materialized view (db/06_views.sql).
+--    The same report read two ways: v_auction_summary recomputes it on every
+--    SELECT, mv_leaderboard returns the result stored at its last REFRESH.
+--    Skipped if db/06_views.sql has not been loaded.
+-- -----------------------------------------------------------------------------
+SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_leaderboard') AS has_mv
+\gset bench_
+
+\if :bench_has_mv
+
+-- Bring the snapshot up to date with the synthetic rows before reading it.
+REFRESH MATERIALIZED VIEW mv_leaderboard;
+ANALYZE mv_leaderboard;
+
+INSERT INTO bench_query (id, label, source, serves, key_query, sql, suite) VALUES
+(101, 'Full report: plain view', 'v_auction_summary', 'recomputed on every read', false,
+ $q$SELECT * FROM v_auction_summary$q$, 'views'),
+(102, 'Full report: materialized view', 'mv_leaderboard', 'stored result', false,
+ $q$SELECT * FROM mv_leaderboard$q$, 'views'),
+(103, 'Live auctions page: plain view', 'v_auction_summary', 'recomputed on every read', false,
+ $q$SELECT * FROM v_auction_summary WHERE status = 'ACTIVE' ORDER BY end_time$q$, 'views'),
+(104, 'Live auctions page: materialized view', 'mv_leaderboard', 'stored result', false,
+ $q$SELECT * FROM mv_leaderboard WHERE status = 'ACTIVE' ORDER BY end_time$q$, 'views'),
+(105, 'Live auctions page: lean v_active_auctions', 'v_active_auctions', 'recomputed, index-backed', false,
+ $q$SELECT * FROM v_active_auctions ORDER BY end_time$q$, 'views'),
+(106, 'One auction: plain view', 'v_auction_summary', 'recomputed on every read', false,
+ format($q$SELECT * FROM v_auction_summary WHERE auction_id = %s$q$, :bench_auction), 'views'),
+(107, 'One auction: materialized view', 'mv_leaderboard', 'stored result', false,
+ format($q$SELECT * FROM mv_leaderboard WHERE auction_id = %s$q$, :bench_auction), 'views');
+
+\echo
+\echo '== Plain view vs materialized view: timing reads...'
+SELECT pg_temp.bench_run('views', 'views');
+
+-- The other side of the trade-off: what a REFRESH costs. Both kinds, 3 runs
+-- each, nothing changed in between (steady state).
+CREATE TEMP TABLE bench_refresh (kind TEXT, ms NUMERIC) ON COMMIT DROP;
+DO $$
+DECLARE
+    t0 TIMESTAMPTZ;
+BEGIN
+    FOR i IN 1..3 LOOP
+        t0 := clock_timestamp();
+        REFRESH MATERIALIZED VIEW mv_leaderboard;
+        INSERT INTO bench_refresh VALUES ('REFRESH', 1000 * EXTRACT(EPOCH FROM clock_timestamp() - t0));
+
+        t0 := clock_timestamp();
+        REFRESH MATERIALIZED VIEW CONCURRENTLY mv_leaderboard;
+        INSERT INTO bench_refresh VALUES ('REFRESH CONCURRENTLY', 1000 * EXTRACT(EPOCH FROM clock_timestamp() - t0));
+    END LOOP;
+END $$;
+
+\echo
+\echo '== Plain view vs materialized view (median of 3 runs, warm cache)'
+SELECT q.id, q.label, r.exec_ms::NUMERIC(10,3) AS median_ms, r.buffers, r.scans
+  FROM bench_query q
+  JOIN bench_result r ON r.id = q.id AND r.phase = 'views'
+ ORDER BY q.id;
+
+\echo '== REFRESH cost (median of 3 runs)'
+SELECT kind, (percentile_cont(0.5) WITHIN GROUP (ORDER BY ms))::NUMERIC(10,3) AS median_ms
+  FROM bench_refresh
+ GROUP BY kind
+ ORDER BY kind;
+
+SELECT (SELECT count(*) FROM mv_leaderboard)                   AS mv_rows,
+       pg_size_pretty(pg_total_relation_size('mv_leaderboard')) AS mv_size_with_index;
+
+\echo '== EXPLAIN (ANALYZE, BUFFERS): full report, plain view vs materialized view'
+\pset format unaligned
+\pset tuples_only on
+SELECT format(E'---- Q%s %s ----\n%s', q.id, q.label, r.plan_text)
+  FROM bench_query q
+  JOIN bench_result r ON r.id = q.id AND r.phase = 'views'
+ WHERE q.id IN (101, 102)
+ ORDER BY q.id;
+\pset tuples_only off
+\pset format aligned
+
+\else
+\echo
+\echo '== mv_leaderboard not found (db/06_views.sql not loaded): skipping plain view vs materialized view.'
+\endif
 
 ROLLBACK;
 
