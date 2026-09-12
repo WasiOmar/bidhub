@@ -111,8 +111,8 @@ DECLARE
     v_root_id    INT;
     v_row_count  INT;
     v_depths     INT[];
-    v_raw_paths  TEXT[][];
-    v_sorted_paths TEXT[][];
+    v_raw_order    INT[];
+    v_sorted_order INT[];
 BEGIN
     SELECT category_id INTO v_root_id FROM categories WHERE slug = 'qt-electronics';
 
@@ -123,17 +123,17 @@ BEGIN
     
     
     
-    SELECT array_agg(path) INTO v_raw_paths FROM get_category_tree(v_root_id);
-    SELECT array_agg(path ORDER BY path) INTO v_sorted_paths FROM get_category_tree(v_root_id);
+    SELECT array_agg(category_id) INTO v_raw_order FROM get_category_tree(v_root_id);
+    SELECT array_agg(t.category_id ORDER BY t.path) INTO v_sorted_order FROM get_category_tree(v_root_id) t;
 
     IF v_row_count = 4
        AND v_depths = ARRAY[0,1,2,3]
-       AND v_raw_paths = v_sorted_paths
+       AND v_raw_order = v_sorted_order
     THEN
         RAISE NOTICE 'PASS  get_category_tree returns exactly 4 rows, depth 0..3, already in path order';
     ELSE
         RAISE NOTICE 'FAIL  test_category_tree: row_count=% (want 4), depths=% (want {0,1,2,3}), already_ordered=%',
-            v_row_count, v_depths, (v_raw_paths = v_sorted_paths);
+            v_row_count, v_depths, (v_raw_order = v_sorted_order);
     END IF;
 END $$;
 
