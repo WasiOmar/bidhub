@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, RequireAuth } from './context/AuthContext.jsx';
+import { ToastProvider } from './context/ToastContext.jsx';
 import Header from './components/Header.jsx';
 import Home from './pages/Home.jsx';
 import Browse from './pages/Browse.jsx';
@@ -14,46 +15,48 @@ import Register from './pages/Register.jsx';
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <div className="app-shell">
-          <Header />
-          <main className="app-main">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/browse" element={<Browse />} />
-              <Route path="/auctions/:id" element={<AuctionDetail />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route
-                path="/create-listing"
-                element={
-                  <RequireAuth>
-                    <CreateListing />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/my-bids"
-                element={
-                  <RequireAuth>
-                    <MyBids />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/notifications"
-                element={
-                  <RequireAuth>
-                    <Notifications />
-                  </RequireAuth>
-                }
-              />
-              <Route path="*" element={<div className="empty-state">Page not found.</div>} />
-            </Routes>
-          </main>
-        </div>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <div className="app-shell">
+            <Header />
+            <main className="app-main">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/browse" element={<Browse />} />
+                <Route path="/auctions/:id" element={<AuctionDetail />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route
+                  path="/create-listing"
+                  element={
+                    <RequireAuth>
+                      <CreateListing />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/my-bids"
+                  element={
+                    <RequireAuth>
+                      <MyBids />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <RequireAuth>
+                      <Notifications />
+                    </RequireAuth>
+                  }
+                />
+                <Route path="*" element={<div className="empty-state">Page not found.</div>} />
+              </Routes>
+            </main>
+          </div>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }
