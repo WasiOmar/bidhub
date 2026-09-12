@@ -5,12 +5,9 @@ import { useToast } from '../context/ToastContext.jsx';
 import { api, ApiError } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
+import { formatMoney, formatTime } from '../utils/format.js';
 
 const POLL_MS = 5000;
-
-function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
-}
 
 const URGENT_MS = 5 * 60 * 1000;
 
@@ -187,7 +184,7 @@ function LeaderboardTable({ rows }) {
             <td>{row.position}</td>
             <td>{row.bidder_name}</td>
             <td>{formatMoney(row.amount)}</td>
-            <td>{new Date(row.placed_at).toLocaleTimeString()}</td>
+            <td>{formatTime(row.placed_at)}</td>
           </tr>
         ))}
       </tbody>
