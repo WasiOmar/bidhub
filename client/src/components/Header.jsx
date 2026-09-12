@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api/client.js';
 
@@ -47,6 +47,12 @@ function NotificationBell() {
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   function handleLogout() {
     logout();
@@ -55,40 +61,53 @@ export default function Header() {
 
   return (
     <header className="app-header">
-      <div className="app-nav">
-        <NavLink to="/" className="app-brand">
-          BidHub
-        </NavLink>
-        <NavLink to="/" end>
-          Home
-        </NavLink>
-        <NavLink to="/browse">Browse</NavLink>
-        <NavLink to="/analytics">Analytics</NavLink>
-        {user && <NavLink to="/my-bids">My Bids</NavLink>}
-        {user?.role === 'SELLER' && <NavLink to="/create-listing">Sell an item</NavLink>}
-      </div>
+      <NavLink to="/" className="app-brand">
+        BidHub
+      </NavLink>
 
-      <div className="app-nav-right">
-        <NotificationBell />
-        {user ? (
-          <>
-            <span className="page-caption" style={{ margin: 0 }}>
-              {user.full_name}
-            </span>
-            <button className="btn" onClick={handleLogout}>
-              Log out
-            </button>
-          </>
-        ) : (
-          <>
-            <NavLink to="/login" className="btn">
-              Log in
-            </NavLink>
-            <NavLink to="/register" className="btn btn-primary">
-              Register
-            </NavLink>
-          </>
-        )}
+      <button
+        type="button"
+        className="nav-toggle"
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        {menuOpen ? '✕' : '☰'}
+      </button>
+
+      <div className={`app-nav-collapsible${menuOpen ? ' open' : ''}`}>
+        <div className="app-nav">
+          <NavLink to="/" end>
+            Home
+          </NavLink>
+          <NavLink to="/browse">Browse</NavLink>
+          <NavLink to="/analytics">Analytics</NavLink>
+          {user && <NavLink to="/my-bids">My Bids</NavLink>}
+          {user?.role === 'SELLER' && <NavLink to="/create-listing">Sell an item</NavLink>}
+        </div>
+
+        <div className="app-nav-right">
+          <NotificationBell />
+          {user ? (
+            <>
+              <span className="page-caption" style={{ margin: 0 }}>
+                {user.full_name}
+              </span>
+              <button className="btn" onClick={handleLogout}>
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/login" className="btn">
+                Log in
+              </NavLink>
+              <NavLink to="/register" className="btn btn-primary">
+                Register
+              </NavLink>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

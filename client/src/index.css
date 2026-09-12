@@ -109,6 +109,25 @@ textarea {
   top: 0;
   z-index: 100;
 }
+.nav-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+.app-nav-collapsible {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: var(--spacing-lg);
+  min-width: 0;
+}
 .app-brand {
   font-weight: 800;
   font-size: 1.4rem;
@@ -147,6 +166,34 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+}
+@media (max-width: 720px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+  .app-nav-collapsible {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: var(--shadow-md);
+  }
+  .app-nav-collapsible.open {
+    display: flex;
+  }
+  .app-nav,
+  .app-nav-right {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
 }
 .bell-button {
   position: relative;
