@@ -80,7 +80,7 @@ router.post(
 
     const result = await query(
       `INSERT INTO items (seller_id, category_id, title, description, condition, attributes, image_url)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'USED'), COALESCE($6, '{}'::jsonb), $7)
+       VALUES ($1, $2, $3, $4, COALESCE($5::item_condition, 'USED'), COALESCE($6, '{}'::jsonb), $7)
        RETURNING item_id, seller_id, category_id, title, description, condition, attributes, image_url, created_at`,
       [
         req.user.user_id,
