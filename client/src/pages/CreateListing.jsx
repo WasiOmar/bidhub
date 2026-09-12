@@ -41,6 +41,7 @@ export default function CreateListing() {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,8 +50,8 @@ export default function CreateListing() {
       .then(({ categories: tree }) => {
         if (!cancelled) setCategories(flattenTree(tree));
       })
-      .catch(() => {
-
+      .catch((err) => {
+        if (!cancelled) setCategoriesError(err.message);
       })
       .finally(() => {
         if (!cancelled) setCategoriesLoading(false);
@@ -144,6 +145,11 @@ export default function CreateListing() {
       <form className="form form-wide" onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="category_id">Category</label>
+          {categoriesError && (
+            <div className="form-error" role="alert">
+              Could not load categories: {categoriesError}
+            </div>
+          )}
           <select
             id="category_id"
             value={form.category_id}
