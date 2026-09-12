@@ -118,7 +118,7 @@ function BidPanel({ auction, sellerId, onBidPlaced }) {
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit} style={{ maxWidth: 260 }}>
+    <form className="form form-narrow" onSubmit={handleSubmit}>
       {error && <div className="form-error" role="alert">{error}</div>}
       <div className="field">
         <label htmlFor="amount">Your bid (minimum {formatMoney(minNextBid)})</label>

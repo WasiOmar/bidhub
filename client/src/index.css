@@ -327,6 +327,12 @@ textarea {
   gap: var(--spacing-md);
   max-width: 440px;
 }
+.form-wide {
+  max-width: 520px;
+}
+.form-narrow {
+  max-width: 260px;
+}
 .field {
   display: flex;
   flex-direction: column;

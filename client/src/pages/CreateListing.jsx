@@ -137,7 +137,7 @@ export default function CreateListing() {
     <div>
       <h1 className="page-title">Sell an item</h1>
       {error && <div className="form-error" role="alert">{error}</div>}
-      <form className="form" onSubmit={handleSubmit} style={{ maxWidth: 520 }}>
+      <form className="form form-wide" onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="category_id">Category</label>
           <select id="category_id" value={form.category_id} onChange={update('category_id')} required>
