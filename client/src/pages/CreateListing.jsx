@@ -213,6 +213,8 @@ export default function CreateListing() {
                 className="btn"
                 onClick={() => removeAttributeRow(i)}
                 disabled={attributeRows.length === 1}
+                title={attributeRows.length === 1 ? 'At least one attribute row is required' : undefined}
+                aria-label={attributeRows.length === 1 ? 'Remove attribute (at least one row is required)' : 'Remove attribute'}
               >
                 Remove
               </button>
