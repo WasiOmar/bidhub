@@ -24,6 +24,19 @@ router.get(
   })
 );
 
+router.get(
+  '/unread-count',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const result = await query(
+      'SELECT count(*)::INT AS unread FROM notifications WHERE user_id = $1 AND is_read = false',
+      [req.user.user_id]
+    );
+
+    return res.json({ unread: result.rows[0].unread });
+  })
+);
+
 router.patch(
   '/:id/read',
   requireAuth,
