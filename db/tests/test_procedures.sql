@@ -35,8 +35,8 @@ INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
 SELECT item_id, 100.00, 10.00, now() + interval '1 day', 'ACTIVE'
 FROM items WHERE title = 'Proc Test Item - Active';
 
-INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
-SELECT item_id, 50.00, 5.00, now() - interval '1 hour', 'CLOSED'
+INSERT INTO auctions (item_id, starting_price, bid_increment, start_time, end_time, status)
+SELECT item_id, 50.00, 5.00, now() - interval '1 day', now() - interval '1 hour', 'CLOSED'
 FROM items WHERE title = 'Proc Test Item - Closed';
 
 
@@ -221,13 +221,13 @@ BEGIN
 
     
     
-    INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
-    SELECT item_id, 100.00, 10.00, now() - interval '1 hour', 'ACTIVE'
+    INSERT INTO auctions (item_id, starting_price, bid_increment, start_time, end_time, status)
+    SELECT item_id, 100.00, 10.00, now() - interval '1 day', now() - interval '1 hour', 'ACTIVE'
     FROM items WHERE title = 'Cursor Test Item A'
     RETURNING auction_id INTO v_auction_a;
 
-    INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
-    SELECT item_id, 200.00, 20.00, now() - interval '2 hours', 'ACTIVE'
+    INSERT INTO auctions (item_id, starting_price, bid_increment, start_time, end_time, status)
+    SELECT item_id, 200.00, 20.00, now() - interval '1 day', now() - interval '2 hours', 'ACTIVE'
     FROM items WHERE title = 'Cursor Test Item B'
     RETURNING auction_id INTO v_auction_b;
 
