@@ -1,8 +1,5 @@
 import { Link } from 'react-router-dom';
-
-function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
-}
+import { formatMoney, formatDateTime } from '../utils/format.js';
 
 export default function AuctionCard({ auction }) {
   return (
@@ -18,7 +15,7 @@ export default function AuctionCard({ auction }) {
       <span className="price">{formatMoney(auction.current_high_bid)}</span>
       <span className="meta">
         {auction.bid_count} bid{auction.bid_count === 1 ? '' : 's'}
-        {auction.end_time && <> · ends {new Date(auction.end_time).toLocaleString()}</>}
+        {auction.end_time && <> · ends {formatDateTime(auction.end_time)}</>}
       </span>
     </Link>
   );

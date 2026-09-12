@@ -2,10 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-
-function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
-}
+import { formatMoney } from '../utils/format.js';
 
 
 

@@ -4,10 +4,7 @@ import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-
-function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
-}
+import { formatMoney, formatDateTime } from '../utils/format.js';
 
 
 
@@ -91,7 +88,7 @@ export default function MyBids() {
                   <td>
                     <Badge tone={status.tone}>{status.label}</Badge>
                   </td>
-                  <td>{new Date(bid.placed_at).toLocaleString()}</td>
+                  <td>{formatDateTime(bid.placed_at)}</td>
                 </tr>
               );
             })}
