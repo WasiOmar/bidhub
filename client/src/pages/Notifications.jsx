@@ -17,6 +17,7 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [markingIds, setMarkingIds] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -39,12 +40,20 @@ export default function Notifications() {
   }, []);
 
   async function markRead(id) {
+    if (markingIds.has(id)) return;
+    setMarkingIds((prev) => new Set(prev).add(id));
     try {
       await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
       showToast('Marked as read.');
     } catch {
       showToast('Could not mark as read.', { tone: 'error' });
+    } finally {
+      setMarkingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
@@ -76,6 +85,7 @@ export default function Notifications() {
               className="btn"
               onClick={() => markRead(n.notification_id)}
               aria-label={`Mark "${n.title}" as read`}
+              disabled={markingIds.has(n.notification_id)}
             >
               Mark read
             </button>
