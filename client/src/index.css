@@ -389,6 +389,12 @@ textarea {
   color: var(--color-text);
   background: rgba(255, 255, 255, 0.05);
 }
+.category-tree button.selected {
+  color: var(--color-text);
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
 .category-tree .count {
   color: var(--color-text-subtle);
   font-size: 0.8rem;

@@ -37,7 +37,7 @@ function CategoryNode({ node, selectedId, onSelect, depth }) {
         <button
           type="button"
           onClick={() => onSelect(node)}
-          style={{ fontWeight: selectedId === node.category_id ? 700 : 400 }}
+          className={selectedId === node.category_id ? 'selected' : ''}
         >
           {node.name} <span className="count">({node.subtreeCount})</span>
         </button>
@@ -115,7 +115,8 @@ export default function Browse() {
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                style={{ fontWeight: !selected ? 700 : 400, marginBottom: 8 }}
+                className={!selected ? 'selected' : ''}
+                style={{ marginBottom: 8 }}
               >
                 All categories
               </button>
