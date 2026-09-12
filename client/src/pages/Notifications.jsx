@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
+import Spinner from '../components/Spinner.jsx';
 
 
 
@@ -53,7 +54,7 @@ export default function Notifications() {
         trg_outbid and trg_close_auction in db/02_triggers.sql.
       </p>
 
-      {loading && <div className="empty-state">Loading…</div>}
+      {loading && <Spinner />}
       {error && <div className="form-error">{error}</div>}
       {!loading && !error && notifications.length === 0 && (
         <div className="empty-state">No notifications yet.</div>

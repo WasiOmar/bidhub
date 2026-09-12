@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import AuctionCard from '../components/AuctionCard.jsx';
+import Spinner from '../components/Spinner.jsx';
 
 
 
@@ -105,7 +106,7 @@ export default function Browse() {
       <h1 className="page-title">Browse categories</h1>
       <div className="two-col">
         <nav className="category-tree card">
-          {loading && <div className="empty-state">Loading…</div>}
+          {loading && <Spinner />}
           {error && <div className="form-error">{error}</div>}
           {!loading && !error && tree.length === 0 && <div className="empty-state">No categories yet.</div>}
           {tree.length > 0 && (

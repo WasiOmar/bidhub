@@ -502,6 +502,27 @@ tr.leading td:first-child::before {
   letter-spacing: 0.05em;
   color: var(--color-accent-light);
 }
+.spinner-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--color-text-muted);
+  padding: var(--spacing-xl);
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent-light);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .empty-state {
   color: var(--color-text-muted);
   padding: var(--spacing-xl);

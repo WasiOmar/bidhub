@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { api, getToken, setToken as persistToken, ApiError } from '../api/client.js';
+import Spinner from '../components/Spinner.jsx';
 
 const AuthContext = createContext(null);
 
@@ -75,7 +76,7 @@ export function RequireAuth({ children }) {
   const location = useLocation();
 
   if (loading) {
-    return <div className="empty-state">Loading…</div>;
+    return <Spinner />;
   }
 
   if (!user) {

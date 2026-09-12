@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
+import Spinner from '../components/Spinner.jsx';
 
 function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
@@ -68,7 +69,7 @@ export default function Analytics() {
     return Array.from(bySeller.values());
   }, [sellerRevenue]);
 
-  if (loading) return <div className="empty-state">Loading…</div>;
+  if (loading) return <Spinner />;
   if (error) return <div className="form-error">{error}</div>;
 
   return (

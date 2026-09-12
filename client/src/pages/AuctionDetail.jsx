@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api, ApiError } from '../api/client.js';
+import Spinner from '../components/Spinner.jsx';
 
 const POLL_MS = 5000;
 
@@ -297,7 +298,7 @@ export default function AuctionDetail() {
 
   const attributesEntries = useMemo(() => Object.entries(item?.attributes || {}), [item]);
 
-  if (loading) return <div className="empty-state">Loading…</div>;
+  if (loading) return <Spinner />;
   if (error) return <div className="form-error">{error}</div>;
   if (!auction || !item) return <div className="empty-state">Auction not found.</div>;
 

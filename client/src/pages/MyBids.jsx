@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
+import Spinner from '../components/Spinner.jsx';
 
 function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
@@ -61,7 +62,7 @@ export default function MyBids() {
     <div>
       <h1 className="page-title">My bids</h1>
 
-      {loading && <div className="empty-state">Loading…</div>}
+      {loading && <Spinner />}
       {error && <div className="form-error">{error}</div>}
       {!loading && !error && bids.length === 0 && <div className="empty-state">You haven't bid on anything yet.</div>}
 
