@@ -85,6 +85,7 @@ export default function Analytics() {
         ) : (
           <>
             <BarChart rows={topBidders.slice(0, 10)} labelKey="full_name" valueKey="total_bid_value" />
+            <div className="table-scroll">
             <table style={{ marginTop: 12 }}>
               <thead>
                 <tr>
@@ -105,6 +106,7 @@ export default function Analytics() {
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         )}
       </section>
@@ -120,6 +122,7 @@ export default function Analytics() {
         ) : (
           <>
             <BarChart rows={latestPerSeller} labelKey="seller_name" valueKey="running_revenue" />
+            <div className="table-scroll">
             <table style={{ marginTop: 12 }}>
               <thead>
                 <tr>
@@ -136,6 +139,7 @@ export default function Analytics() {
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         )}
       </section>

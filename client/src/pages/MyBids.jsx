@@ -69,6 +69,7 @@ export default function MyBids() {
       {!loading && !error && bids.length === 0 && <EmptyState icon="🏷️">You haven't bid on anything yet.</EmptyState>}
 
       {bids.length > 0 && (
+        <div className="table-scroll">
         <table>
           <thead>
             <tr>
@@ -96,6 +97,7 @@ export default function MyBids() {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

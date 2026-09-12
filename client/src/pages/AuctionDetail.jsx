@@ -41,6 +41,7 @@ function AttributesTable({ attributes }) {
   if (entries.length === 0) return null;
 
   return (
+    <div className="table-scroll">
     <table>
       <tbody>
         {entries.map(([key, value]) => (
@@ -51,6 +52,7 @@ function AttributesTable({ attributes }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 
@@ -166,6 +168,7 @@ function LeaderboardTable({ rows }) {
   }
 
   return (
+    <div className="table-scroll">
     <table>
       <thead>
         <tr>
@@ -189,6 +192,7 @@ function LeaderboardTable({ rows }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

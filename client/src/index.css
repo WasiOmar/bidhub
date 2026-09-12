@@ -460,6 +460,10 @@ textarea {
   font-size: 0.8rem;
   font-weight: 600;
 }
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
 table {
   width: 100%;
   border-collapse: separate;
