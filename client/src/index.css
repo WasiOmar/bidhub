@@ -629,7 +629,7 @@ tr.leading td:first-child::before {
 }
 .badge-closed {
   background: rgba(107, 114, 128, 0.15);
-  color: #9ca3af;
+  color: var(--color-text-muted);
   border: 1px solid rgba(156, 163, 175, 0.25);
 }
 .badge-outbid {
