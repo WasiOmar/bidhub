@@ -30,7 +30,13 @@ function CategoryNode({ node, selectedId, onSelect, depth }) {
     <li>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         {hasChildren && (
-          <button type="button" onClick={() => setExpanded((e) => !e)} style={{ width: 18 }}>
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            style={{ width: 18 }}
+            aria-expanded={expanded}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.name}`}
+          >
             {expanded ? '−' : '+'}
           </button>
         )}

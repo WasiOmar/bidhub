@@ -37,9 +37,18 @@ function NotificationBell() {
   if (!user) return null;
 
   return (
-    <NavLink to="/notifications" className="bell-button" title={`${unreadCount} unread notifications`}>
-      🔔
-      {unreadCount > 0 && <span className="bell-count">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+    <NavLink
+      to="/notifications"
+      className="bell-button"
+      title={`${unreadCount} unread notifications`}
+      aria-label={`Notifications, ${unreadCount} unread`}
+    >
+      <span aria-hidden="true">🔔</span>
+      {unreadCount > 0 && (
+        <span className="bell-count" aria-hidden="true">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
     </NavLink>
   );
 }
@@ -72,7 +81,7 @@ export default function Header() {
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen((open) => !open)}
       >
-        {menuOpen ? '✕' : '☰'}
+        <span aria-hidden="true">{menuOpen ? '✕' : '☰'}</span>
       </button>
 
       <div className={`app-nav-collapsible${menuOpen ? ' open' : ''}`}>
