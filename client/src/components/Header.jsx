@@ -17,8 +17,8 @@ function NotificationBell() {
   const refresh = useCallback(async () => {
     if (!user) return;
     try {
-      const { notifications } = await api.get('/notifications');
-      setUnreadCount(notifications.filter((n) => !n.is_read).length);
+      const { unread } = await api.get('/notifications/unread-count');
+      setUnreadCount(unread);
     } catch {
       
     }
