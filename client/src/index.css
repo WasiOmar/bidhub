@@ -737,6 +737,12 @@ tr.leading td:first-child::before {
   border-color: rgba(239, 68, 68, 0.4);
   color: #fca5a5;
 }
+.mt-md {
+  margin-top: 16px;
+}
+.caption-inline {
+  margin: 0;
+}
 .empty-state-icon {
   display: block;
   font-size: 2rem;

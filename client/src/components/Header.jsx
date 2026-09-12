@@ -99,7 +99,7 @@ export default function Header() {
           <NotificationBell />
           {user ? (
             <>
-              <span className="page-caption" style={{ margin: 0 }}>
+              <span className="page-caption caption-inline">
                 {user.full_name}
               </span>
               <button className="btn" onClick={handleLogout}>

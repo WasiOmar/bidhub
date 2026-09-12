@@ -67,7 +67,7 @@ export default function Notifications() {
           <div>
             <Badge tone={TYPE_TONE[n.type] || 'closed'}>{n.type}</Badge>
             <div>{n.title}</div>
-            <div className="page-caption" style={{ margin: 0 }}>
+            <div className="page-caption caption-inline">
               {n.message}
             </div>
           </div>

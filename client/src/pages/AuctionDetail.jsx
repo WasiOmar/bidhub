@@ -235,7 +235,7 @@ function BidMomentum({ rows }) {
               fill="var(--color-success)"
             />
           </svg>
-          <span className="page-caption" style={{ margin: 0 }}>
+          <span className="page-caption caption-inline">
             +{formatMoney(j.jump)}
           </span>
         </div>
@@ -332,7 +332,7 @@ export default function AuctionDetail() {
         Ends in {countdown.text}
       </span>
 
-      <div className="two-col" style={{ marginTop: 16 }}>
+      <div className="two-col mt-md">
         <div>
           {item.image_url && (
             <div className="auction-hero-media">
@@ -340,7 +340,7 @@ export default function AuctionDetail() {
             </div>
           )}
           <div className="card">
-            <p style={{ margin: 0 }}>
+            <p className="caption-inline">
               Current high bid: <strong>{formatMoney(auction.current_high_bid)}</strong>
             </p>
             <p className="page-caption" style={{ margin: '4px 0 0' }}>
@@ -354,7 +354,7 @@ export default function AuctionDetail() {
           </div>
 
           {attributesEntries.length > 0 && (
-            <div style={{ marginTop: 16 }}>
+            <div className="mt-md">
               <h3>Specifications</h3>
               {
 }
@@ -362,12 +362,12 @@ export default function AuctionDetail() {
             </div>
           )}
 
-          <div style={{ marginTop: 16 }}>
+          <div className="mt-md">
             <h3>Leaderboard</h3>
             <LeaderboardTable rows={leaderboardRows} />
           </div>
 
-          <div style={{ marginTop: 16 }}>
+          <div className="mt-md">
             <h3>Bid momentum</h3>
             <p className="page-caption">LAG(amount) OVER (PARTITION BY auction_id ORDER BY placed_at) — v_bid_momentum</p>
             <BidMomentum rows={leaderboardRows} />
