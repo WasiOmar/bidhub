@@ -373,6 +373,9 @@ textarea {
   min-width: 140px;
 }
 .form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   background: var(--color-danger-bg);
@@ -380,6 +383,21 @@ textarea {
   color: #fca5a5;
   font-size: 0.9rem;
   font-weight: 500;
+  margin-bottom: var(--spacing-md);
+}
+.form-error::before {
+  content: '⚠️';
+  flex-shrink: 0;
+}
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--color-text-subtle);
 }
 .card {
   background: var(--color-surface);
