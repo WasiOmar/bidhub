@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <div>
       <h1 className="page-title">Log in</h1>
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       <form className="form" onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="email">Email</label>

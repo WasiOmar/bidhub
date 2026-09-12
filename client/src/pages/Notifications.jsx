@@ -57,7 +57,7 @@ export default function Notifications() {
       </p>
 
       {loading && <Spinner />}
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       {!loading && !error && notifications.length === 0 && (
         <EmptyState icon="🔔">No notifications yet.</EmptyState>
       )}

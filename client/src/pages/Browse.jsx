@@ -108,7 +108,7 @@ export default function Browse() {
       <div className="two-col">
         <nav className="category-tree card">
           {loading && <Spinner />}
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
           {!loading && !error && tree.length === 0 && <EmptyState icon="🗂️">No categories yet.</EmptyState>}
           {tree.length > 0 && (
             <>

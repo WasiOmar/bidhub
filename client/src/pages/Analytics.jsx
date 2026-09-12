@@ -71,7 +71,7 @@ export default function Analytics() {
   }, [sellerRevenue]);
 
   if (loading) return <Spinner />;
-  if (error) return <div className="form-error">{error}</div>;
+  if (error) return <div className="form-error" role="alert">{error}</div>;
 
   return (
     <div>

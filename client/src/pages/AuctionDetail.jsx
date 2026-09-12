@@ -119,7 +119,7 @@ function BidPanel({ auction, sellerId, onBidPlaced }) {
 
   return (
     <form className="form" onSubmit={handleSubmit} style={{ maxWidth: 260 }}>
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       <div className="field">
         <label htmlFor="amount">Your bid (minimum {formatMoney(minNextBid)})</label>
         <input
@@ -310,7 +310,7 @@ export default function AuctionDetail() {
   const attributesEntries = useMemo(() => Object.entries(item?.attributes || {}), [item]);
 
   if (loading) return <Spinner />;
-  if (error) return <div className="form-error">{error}</div>;
+  if (error) return <div className="form-error" role="alert">{error}</div>;
   if (!auction || !item) return <div className="empty-state">Auction not found.</div>;
 
   return (

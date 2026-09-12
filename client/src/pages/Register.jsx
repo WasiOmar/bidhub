@@ -30,7 +30,7 @@ export default function Register() {
   return (
     <div>
       <h1 className="page-title">Register</h1>
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       <form className="form" onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="full_name">Full name</label>

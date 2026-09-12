@@ -35,7 +35,7 @@ export default function Home() {
       <p className="page-caption">Any category, any domain — electronics, art, vehicles, instruments, books.</p>
 
       {loading && <Spinner label="Loading auctions…" />}
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       {!loading && !error && auctions.length === 0 && (
         <EmptyState icon="🔨">No active auctions right now. Check back soon.</EmptyState>
       )}

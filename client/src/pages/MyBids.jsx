@@ -65,7 +65,7 @@ export default function MyBids() {
       <h1 className="page-title">My bids</h1>
 
       {loading && <Spinner />}
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       {!loading && !error && bids.length === 0 && <EmptyState icon="🏷️">You haven't bid on anything yet.</EmptyState>}
 
       {bids.length > 0 && (

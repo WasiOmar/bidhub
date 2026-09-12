@@ -136,7 +136,7 @@ export default function CreateListing() {
   return (
     <div>
       <h1 className="page-title">Sell an item</h1>
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
       <form className="form" onSubmit={handleSubmit} style={{ maxWidth: 520 }}>
         <div className="field">
           <label htmlFor="category_id">Category</label>
