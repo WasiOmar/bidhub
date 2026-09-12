@@ -748,6 +748,9 @@ tr.leading td:first-child::before {
 .mt-md {
   margin-top: 16px;
 }
+.mb-sm {
+  margin-bottom: 8px;
+}
 .caption-inline {
   margin: 0;
 }

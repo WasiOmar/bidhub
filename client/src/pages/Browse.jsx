@@ -121,8 +121,7 @@ export default function Browse() {
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className={!selected ? 'selected' : ''}
-                style={{ marginBottom: 8 }}
+                className={`mb-sm${!selected ? ' selected' : ''}`}
               >
                 All categories
               </button>
