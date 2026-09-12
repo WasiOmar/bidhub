@@ -46,7 +46,7 @@ function AttributesTable({ attributes }) {
       <tbody>
         {entries.map(([key, value]) => (
           <tr key={key}>
-            <th style={{ textTransform: 'capitalize', width: '40%' }}>{key.replace(/_/g, ' ')}</th>
+            <th className="attr-label">{key.replace(/_/g, ' ')}</th>
             <td>{String(value)}</td>
           </tr>
         ))}
@@ -343,14 +343,14 @@ export default function AuctionDetail() {
             <p className="caption-inline">
               Current high bid: <strong>{formatMoney(auction.current_high_bid)}</strong>
             </p>
-            <p className="page-caption" style={{ margin: '4px 0 0' }}>
+            <p className="page-caption tight-top">
               {auction.bid_count} bid{auction.bid_count === 1 ? '' : 's'} · starting price{' '}
               {formatMoney(auction.starting_price)} · increment {formatMoney(auction.bid_increment)}
             </p>
-            <p className="page-caption" style={{ margin: '4px 0 0' }}>
+            <p className="page-caption tight-top">
               Sold by {item.seller_name} · condition: {item.condition}
             </p>
-            {item.description && <p style={{ marginBottom: 0 }}>{item.description}</p>}
+            {item.description && <p className="mb-0">{item.description}</p>}
           </div>
 
           {attributesEntries.length > 0 && (
@@ -375,7 +375,7 @@ export default function AuctionDetail() {
         </div>
 
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Place a bid</h3>
+          <h3 className="mt-0">Place a bid</h3>
           <BidPanel
             auction={auction}
             sellerId={item.seller_id}

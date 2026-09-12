@@ -77,7 +77,7 @@ export default function Analytics() {
     <div>
       <h1 className="page-title">Analytics</h1>
 
-      <section style={{ marginBottom: 32 }}>
+      <section className="section-spaced">
         <h2>Top bidders</h2>
         <p className="page-caption">RANK() OVER (ORDER BY total_bid_value DESC) — v_top_bidders</p>
         {topBidders.length === 0 ? (
@@ -86,7 +86,7 @@ export default function Analytics() {
           <>
             <BarChart rows={topBidders.slice(0, 10)} labelKey="full_name" valueKey="total_bid_value" />
             <div className="table-scroll">
-            <table style={{ marginTop: 12 }}>
+            <table className="mt-sm">
               <thead>
                 <tr>
                   <th>Rank</th>
@@ -123,7 +123,7 @@ export default function Analytics() {
           <>
             <BarChart rows={latestPerSeller} labelKey="seller_name" valueKey="running_revenue" />
             <div className="table-scroll">
-            <table style={{ marginTop: 12 }}>
+            <table className="mt-sm">
               <thead>
                 <tr>
                   <th>Seller</th>

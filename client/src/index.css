@@ -757,8 +757,27 @@ tr.leading td:first-child::before {
 .mt-md {
   margin-top: 16px;
 }
+.mt-sm {
+  margin-top: 12px;
+}
 .mb-sm {
   margin-bottom: 8px;
+}
+.section-spaced {
+  margin-bottom: 32px;
+}
+.attr-label {
+  text-transform: capitalize;
+  width: 40%;
+}
+.tight-top {
+  margin: 4px 0 0;
+}
+.mb-0 {
+  margin-bottom: 0;
+}
+.mt-0 {
+  margin-top: 0;
 }
 .caption-inline {
   margin: 0;
