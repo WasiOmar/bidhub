@@ -322,6 +322,11 @@ export default function AuctionDetail() {
 
       <div className="two-col" style={{ marginTop: 16 }}>
         <div>
+          {item.image_url && (
+            <div className="auction-hero-media">
+              <img src={item.image_url} alt={item.title} loading="lazy" onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }} />
+            </div>
+          )}
           <div className="card">
             <p style={{ margin: 0 }}>
               Current high bid: <strong>{formatMoney(auction.current_high_bid)}</strong>
