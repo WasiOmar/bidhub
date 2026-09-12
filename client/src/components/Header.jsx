@@ -76,7 +76,7 @@ export default function Header() {
       </button>
 
       <div className={`app-nav-collapsible${menuOpen ? ' open' : ''}`}>
-        <div className="app-nav">
+        <nav className="app-nav" aria-label="Primary">
           <NavLink to="/" end>
             Home
           </NavLink>
@@ -84,7 +84,7 @@ export default function Header() {
           <NavLink to="/analytics">Analytics</NavLink>
           {user && <NavLink to="/my-bids">My Bids</NavLink>}
           {user?.role === 'SELLER' && <NavLink to="/create-listing">Sell an item</NavLink>}
-        </div>
+        </nav>
 
         <div className="app-nav-right">
           <NotificationBell />

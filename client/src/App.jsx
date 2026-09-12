@@ -18,8 +18,11 @@ export default function App() {
       <ToastProvider>
         <AuthProvider>
           <div className="app-shell">
+            <a href="#main-content" className="skip-link">
+              Skip to content
+            </a>
             <Header />
-            <main className="app-main">
+            <main className="app-main" id="main-content" tabIndex={-1}>
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/browse" element={<Browse />} />

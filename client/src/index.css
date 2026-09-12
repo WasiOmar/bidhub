@@ -69,6 +69,21 @@ textarea {
   font-family: inherit;
   font-size: inherit;
 }
+.skip-link {
+  position: absolute;
+  top: -48px;
+  left: var(--spacing-md);
+  z-index: 1000;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: #ffffff;
+  font-weight: 700;
+  transition: top 0.2s ease;
+}
+.skip-link:focus {
+  top: var(--spacing-md);
+}
 .app-shell {
   display: flex;
   flex-direction: column;
