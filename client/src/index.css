@@ -333,6 +333,9 @@ textarea {
 .form-narrow {
   max-width: 260px;
 }
+.align-self-start {
+  align-self: flex-start;
+}
 .field {
   display: flex;
   flex-direction: column;

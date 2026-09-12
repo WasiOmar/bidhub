@@ -202,7 +202,7 @@ export default function CreateListing() {
               </button>
             </div>
           ))}
-          <button type="button" className="btn" onClick={addAttributeRow} style={{ alignSelf: 'flex-start' }}>
+          <button type="button" className="btn align-self-start" onClick={addAttributeRow}>
             + Add attribute
           </button>
         </div>
