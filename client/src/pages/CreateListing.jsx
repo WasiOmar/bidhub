@@ -25,6 +25,7 @@ export default function CreateListing() {
     title: '',
     description: '',
     condition: 'USED',
+    image_url: '',
     starting_price: '',
     bid_increment: '1.00',
     reserve_price: '',
@@ -109,6 +110,7 @@ export default function CreateListing() {
         title: form.title,
         description: form.description || undefined,
         condition: form.condition,
+        image_url: form.image_url || undefined,
         attributes,
       });
 
@@ -153,6 +155,17 @@ export default function CreateListing() {
         <div className="field">
           <label htmlFor="description">Description</label>
           <textarea id="description" rows={3} value={form.description} onChange={update('description')} />
+        </div>
+
+        <div className="field">
+          <label htmlFor="image_url">Image URL (optional)</label>
+          <input
+            id="image_url"
+            type="url"
+            placeholder="https://…"
+            value={form.image_url}
+            onChange={update('image_url')}
+          />
         </div>
 
         <div className="field">
