@@ -69,6 +69,16 @@ textarea {
   font-family: inherit;
   font-size: inherit;
 }
+:focus-visible {
+  outline: 2px solid var(--color-accent-light);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: none;
+}
 .skip-link {
   position: absolute;
   top: -48px;
