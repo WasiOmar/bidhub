@@ -170,8 +170,12 @@ export default function CreateListing() {
           <label>Attributes</label>
           {attributeRows.map((row, i) => (
             <div className="field-row" key={i}>
-              <input placeholder="key (e.g. ram)" value={row.key} onChange={updateAttributeRow(i, 'key')} />
-              <input placeholder="value (e.g. 16GB)" value={row.value} onChange={updateAttributeRow(i, 'value')} />
+              <div className="field">
+                <input placeholder="key (e.g. ram)" value={row.key} onChange={updateAttributeRow(i, 'key')} />
+              </div>
+              <div className="field">
+                <input placeholder="value (e.g. 16GB)" value={row.value} onChange={updateAttributeRow(i, 'value')} />
+              </div>
               <button
                 type="button"
                 className="btn"
