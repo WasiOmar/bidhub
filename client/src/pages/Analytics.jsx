@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
@@ -80,7 +81,7 @@ export default function Analytics() {
         <h2>Top bidders</h2>
         <p className="page-caption">RANK() OVER (ORDER BY total_bid_value DESC) — v_top_bidders</p>
         {topBidders.length === 0 ? (
-          <div className="empty-state">No bids yet.</div>
+          <EmptyState icon="📊">No bids yet.</EmptyState>
         ) : (
           <>
             <BarChart rows={topBidders.slice(0, 10)} labelKey="full_name" valueKey="total_bid_value" />
@@ -115,7 +116,7 @@ export default function Analytics() {
           v_seller_revenue
         </p>
         {latestPerSeller.length === 0 ? (
-          <div className="empty-state">No completed sales yet.</div>
+          <EmptyState icon="💰">No completed sales yet.</EmptyState>
         ) : (
           <>
             <BarChart rows={latestPerSeller} labelKey="seller_name" valueKey="running_revenue" />

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
@@ -65,7 +66,7 @@ export default function MyBids() {
 
       {loading && <Spinner />}
       {error && <div className="form-error">{error}</div>}
-      {!loading && !error && bids.length === 0 && <div className="empty-state">You haven't bid on anything yet.</div>}
+      {!loading && !error && bids.length === 0 && <EmptyState icon="🏷️">You haven't bid on anything yet.</EmptyState>}
 
       {bids.length > 0 && (
         <table>

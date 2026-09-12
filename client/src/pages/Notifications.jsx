@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 const TYPE_TONE = {
   OUTBID: 'outbid',
@@ -55,7 +56,7 @@ export default function Notifications() {
       {loading && <Spinner />}
       {error && <div className="form-error">{error}</div>}
       {!loading && !error && notifications.length === 0 && (
-        <div className="empty-state">No notifications yet.</div>
+        <EmptyState icon="🔔">No notifications yet.</EmptyState>
       )}
 
       {notifications.map((n) => (

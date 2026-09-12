@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import AuctionCard from '../components/AuctionCard.jsx';
 import Spinner from '../components/Spinner.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 
 
@@ -108,7 +109,7 @@ export default function Browse() {
         <nav className="category-tree card">
           {loading && <Spinner />}
           {error && <div className="form-error">{error}</div>}
-          {!loading && !error && tree.length === 0 && <div className="empty-state">No categories yet.</div>}
+          {!loading && !error && tree.length === 0 && <EmptyState icon="🗂️">No categories yet.</EmptyState>}
           {tree.length > 0 && (
             <>
               <button
@@ -135,7 +136,7 @@ export default function Browse() {
 
         <div>
           {!loading && visibleAuctions.length === 0 && (
-            <div className="empty-state">No active auctions in this category.</div>
+            <EmptyState icon="🔨">No active auctions in this category.</EmptyState>
           )}
           {visibleAuctions.length > 0 && (
             <div className="grid">

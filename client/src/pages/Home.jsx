@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import AuctionCard from '../components/AuctionCard.jsx';
 import Spinner from '../components/Spinner.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 export default function Home() {
   const [auctions, setAuctions] = useState([]);
@@ -36,7 +37,7 @@ export default function Home() {
       {loading && <Spinner label="Loading auctions…" />}
       {error && <div className="form-error">{error}</div>}
       {!loading && !error && auctions.length === 0 && (
-        <div className="empty-state">No active auctions right now. Check back soon.</div>
+        <EmptyState icon="🔨">No active auctions right now. Check back soon.</EmptyState>
       )}
 
       <div className="grid">
