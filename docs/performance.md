@@ -134,16 +134,18 @@ at that scale:
 
 ## Findings for the application layer
 
-These are not changed here (P2 doesn't edit `server/` or `client/`), but the
-measurements point at them:
+These were not changed on this branch (P2 doesn't edit `server/` or `client/`),
+but the measurements pointed at them:
 
-1. **The notification bell can't use `idx_notifications_user_unread`.** The
-   header polls `GET /api/notifications`, which runs `WHERE user_id = $1` with no
-   `is_read` filter and counts unread rows in JavaScript (Q7). The planner can
+1. **The notification bell couldn't use `idx_notifications_user_unread`.** The
+   header polled `GET /api/notifications`, which runs `WHERE user_id = $1` with no
+   `is_read` filter, and counted unread rows in JavaScript (Q7). The planner can
    only use a partial index when the query implies its `WHERE is_read = false`,
-   so the bell's query stays a sequential scan: 6 ms at 100k notifications, and it
-   grows with the table. A count endpoint with `AND is_read = false` would run
-   at Q6's 0.012 ms.
+   so the bell's query stayed a sequential scan: 6 ms at 100k notifications, and it
+   grows with the table. A count endpoint with `AND is_read = false` runs at Q6's
+   0.012 ms.
+   **Resolved in INT-01:** `GET /api/notifications/unread-count` runs exactly Q6's
+   predicate, and the header bell now polls it instead of the full list.
 2. **The homepage re-aggregates bids on every poll.** Q1 runs two `LATERAL`
    subqueries per live auction. With the composite index that's fine at this
    scale (17–35 ms for 515 auctions). `mv_leaderboard` (P2-05, `db/06_views.sql`)
