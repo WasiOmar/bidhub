@@ -72,7 +72,11 @@ export default function Notifications() {
             </div>
           </div>
           {!n.is_read && (
-            <button className="btn" onClick={() => markRead(n.notification_id)}>
+            <button
+              className="btn"
+              onClick={() => markRead(n.notification_id)}
+              aria-label={`Mark "${n.title}" as read`}
+            >
               Mark read
             </button>
           )}
