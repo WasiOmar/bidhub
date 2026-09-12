@@ -531,6 +531,14 @@ textarea {
   font-size: 0.8rem;
   font-weight: 600;
 }
+.category-node-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.category-toggle {
+  width: 18px;
+}
 .table-scroll {
   width: 100%;
   overflow-x: auto;

@@ -28,12 +28,12 @@ function CategoryNode({ node, selectedId, onSelect, depth }) {
 
   return (
     <li>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="category-node-row">
         {hasChildren && (
           <button
             type="button"
             onClick={() => setExpanded((e) => !e)}
-            style={{ width: 18 }}
+            className="category-toggle"
             aria-expanded={expanded}
             aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.name}`}
           >
