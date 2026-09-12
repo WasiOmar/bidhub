@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
-
-function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
-}
+import AuctionCard from '../components/AuctionCard.jsx';
 
 export default function Home() {
   const [auctions, setAuctions] = useState([]);
@@ -44,13 +40,7 @@ export default function Home() {
 
       <div className="grid">
         {auctions.map((a) => (
-          <Link key={a.auction_id} to={`/auctions/${a.auction_id}`} className="card auction-card">
-            <span className="title">{a.item_title}</span>
-            <span className="price">{formatMoney(a.current_high_bid)}</span>
-            <span className="meta">
-              {a.bid_count} bid{a.bid_count === 1 ? '' : 's'} · ends {new Date(a.end_time).toLocaleString()}
-            </span>
-          </Link>
+          <AuctionCard key={a.auction_id} auction={a} />
         ))}
       </div>
     </div>
