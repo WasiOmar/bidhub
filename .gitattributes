@@ -1,0 +1,9 @@
+# Store and check out every text file with LF endings, whatever core.autocrlf says.
+# psql treats a bare CR as part of the line, so a CR-only .sql file silently turns
+# every backslash command (\gset, \set, \ir) into garbage — see db/tests/.
+* text=auto eol=lf
+
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.ico  binary
