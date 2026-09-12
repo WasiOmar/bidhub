@@ -99,7 +99,7 @@ export default function Header() {
           <NotificationBell />
           {user ? (
             <>
-              <span className="page-caption caption-inline">
+              <span className="page-caption caption-inline" aria-label={`Logged in as ${user.full_name}`}>
                 {user.full_name}
               </span>
               <button className="btn" onClick={handleLogout}>
