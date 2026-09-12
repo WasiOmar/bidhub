@@ -81,6 +81,18 @@ textarea {
   margin: 0 auto;
   padding: var(--spacing-xl) var(--spacing-lg);
 }
+@media (max-width: 640px) {
+  .app-main {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+  .app-header {
+    padding: 12px var(--spacing-md);
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--spacing-md);
+  }
+}
 .page-title {
   margin: 0 0 var(--spacing-sm);
   font-size: 1.85rem;
@@ -315,10 +327,12 @@ textarea {
 }
 .field-row {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
 }
 .field-row .field {
   flex: 1;
+  min-width: 140px;
 }
 .form-error {
   padding: 12px 16px;
