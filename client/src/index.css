@@ -393,7 +393,7 @@ textarea {
   border-radius: var(--radius-sm);
   background: var(--color-danger-bg);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+  color: var(--color-danger-text);
   font-size: 0.9rem;
   font-weight: 500;
   margin-bottom: var(--spacing-md);
@@ -752,11 +752,11 @@ tr.leading td:first-child::before {
 }
 .toast-success {
   border-color: rgba(52, 211, 153, 0.4);
-  color: #6ee7b7;
+  color: var(--color-success-text);
 }
 .toast-error {
   border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
+  color: var(--color-danger-text);
 }
 .mt-md {
   margin-top: 16px;
