@@ -44,6 +44,7 @@ function CategoryNode({ node, selectedId, onSelect, depth }) {
           type="button"
           onClick={() => onSelect(node)}
           className={selectedId === node.category_id ? 'selected' : ''}
+          aria-pressed={selectedId === node.category_id}
         >
           {node.name} <span className="count">({node.subtreeCount})</span>
         </button>
@@ -122,6 +123,7 @@ export default function Browse() {
                 type="button"
                 onClick={() => setSelected(null)}
                 className={`mb-sm${!selected ? ' selected' : ''}`}
+                aria-pressed={!selected}
               >
                 All categories
               </button>
