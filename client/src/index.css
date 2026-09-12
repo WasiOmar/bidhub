@@ -632,6 +632,19 @@ tr.leading td:first-child::before {
     transform: rotate(360deg);
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .auction-card:hover {
+    transform: none;
+  }
+}
 .empty-state {
   color: var(--color-text-muted);
   padding: var(--spacing-xl);
