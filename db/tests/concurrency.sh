@@ -17,7 +17,7 @@ if [ "$HAS_PLACE_BID" -eq 0 ]; then
     echo "SKIP  place_bid() not found — merge db/procedures (P2-01) first."
     exit 0
 fi
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
 -- Clean previous fixtures. auctions has no `title` column — only items does —
 -- so both lookups below join through items rather than guessing at
@@ -34,26 +34,24 @@ DELETE FROM auctions    WHERE auction_id IN (
 );
 DELETE FROM items       WHERE title = 'Concurrency Test Item';
 DELETE FROM categories  WHERE slug = 'concurrency-test';
-DELETE FROM users       WHERE email IN ('con-bidder-a@bidhub.local', 'con-bidder-b@bidhub.local');
--- Users
+-- Users are reused across runs, never deleted: audit_log.actor_id is
+-- ON DELETE SET NULL, and that UPDATE on the append-only audit_log is
+-- rejected by trg_audit_immutable, which would abort every second run.
 INSERT INTO users (full_name, email, password_hash, role)
 VALUES
-    ('Bidder A', 'con-bidder-a@bidhub.local', 'x', 'BUYER'),
-    ('Bidder B', 'con-bidder-b@bidhub.local', 'x', 'BUYER')
-RETURNING user_id;
--- Category
-INSERT INTO categories (name, slug) VALUES ('Concurrency Test', 'concurrency-test')
-RETURNING category_id;
--- Item + auction (seller = Bidder A so we can also demo AU003 self-bid guard)
+    ('Concurrency Seller', 'con-seller@bidhub.local',   'x', 'SELLER'),
+    ('Bidder A',           'con-bidder-a@bidhub.local', 'x', 'BUYER'),
+    ('Bidder B',           'con-bidder-b@bidhub.local', 'x', 'BUYER')
+ON CONFLICT (email) DO NOTHING;
+INSERT INTO categories (name, slug) VALUES ('Concurrency Test', 'concurrency-test');
+-- A separate seller, so neither concurrent bidder trips the AU003 self-bid guard.
 INSERT INTO items (seller_id, category_id, title, condition)
-SELECT ua.user_id, c.category_id, 'Concurrency Test Item', 'USED'
-FROM users ua, categories c
-WHERE ua.email = 'con-bidder-a@bidhub.local' AND c.slug = 'concurrency-test'
-RETURNING item_id;
+SELECT us.user_id, c.category_id, 'Concurrency Test Item', 'USED'
+FROM users us, categories c
+WHERE us.email = 'con-seller@bidhub.local' AND c.slug = 'concurrency-test';
 INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
 SELECT item_id, 100.00, 10.00, now() + interval '1 day', 'ACTIVE'
-FROM items WHERE title = 'Concurrency Test Item'
-RETURNING auction_id;
+FROM items WHERE title = 'Concurrency Test Item';
 COMMIT;
 SQL
 AUCTION_ID=$(psql "$DATABASE_URL" -At -c "
@@ -70,10 +68,14 @@ if [ -z "$AUCTION_ID" ] || [ -z "$BIDDER_A" ] || [ -z "$BIDDER_B" ]; then
     echo "FAIL  fixture setup failed"
     exit 1
 fi
-psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -c \
+# Both sessions bid the same 110.00 at once. place_bid locks the auction row
+# FOR UPDATE, so the second waits, then re-reads the high bid (now 110.00) and
+# must reject its own 110.00 with AU001. VERBOSITY=verbose puts the SQLSTATE
+# in the error text.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -v VERBOSITY=verbose -c \
     "CALL place_bid($BIDDER_A, $AUCTION_ID, 110.00)" \
     > "${SCRIPT_DIR}/.con_result_a.txt" 2>&1 &
-psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -c \
+psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -v VERBOSITY=verbose -c \
     "CALL place_bid($BIDDER_B, $AUCTION_ID, 110.00)" \
     > "${SCRIPT_DIR}/.con_result_b.txt" 2>&1 &
 wait
@@ -83,34 +85,23 @@ BID_COUNT=$(psql "$DATABASE_URL" -At -c \
     "SELECT COUNT(*) FROM bids WHERE auction_id = $AUCTION_ID")
 HIGH_BID=$(psql "$DATABASE_URL" -At -c \
     "SELECT MAX(amount) FROM bids WHERE auction_id = $AUCTION_ID")
+ACCEPTED=0
+REJECTED=0
+for RESULT in "$RESULT_A" "$RESULT_B"; do
+    if echo "$RESULT" | grep -q '^CALL'; then
+        ACCEPTED=$((ACCEPTED + 1))
+    elif echo "$RESULT" | grep -q 'AU001'; then
+        REJECTED=$((REJECTED + 1))
+    fi
+done
 ISOLATION_PASS=1
-if [ "$BID_COUNT" -ne 2 ]; then
-    echo "FAIL  Isolation: expected 2 bids, got $BID_COUNT"
+if [ "$BID_COUNT" -eq 1 ] && [ "$HIGH_BID" = "110.00" ] && [ "$ACCEPTED" -eq 1 ] && [ "$REJECTED" -eq 1 ]; then
+    echo "PASS  Isolation: two concurrent 110.00 bids serialised by FOR UPDATE: one accepted, the other rejected (AU001)"
+else
+    echo "FAIL  Isolation: expected 1 accepted bid at 110.00 and 1 AU001, got $BID_COUNT bid(s), high bid $HIGH_BID"
     echo "       Result A: $RESULT_A"
     echo "       Result B: $RESULT_B"
     ISOLATION_PASS=0
-else
-    LOSER_SAW_CONFLICT=0
-    if echo "$RESULT_A" | grep -qi "AU001\|ERROR"; then
-        LOSER_SAW_CONFLICT=1
-    fi
-    if echo "$RESULT_B" | grep -qi "AU001\|ERROR"; then
-        LOSER_SAW_CONFLICT=1
-    fi
-    if [ "$LOSER_SAW_CONFLICT" -eq 1 ]; then
-        echo "PASS  Isolation: concurrent bids serialised by FOR UPDATE: winner at $HIGH_BID, loser rejected (AU001)"
-    else
-        AMT_A=$(echo "$RESULT_A" | grep -oP '\d+\.\d+' | head -1 || true)
-        AMT_B=$(echo "$RESULT_B" | grep -oP '\d+\.\d+' | head -1 || true)
-        if [ -n "$AMT_A" ] && [ -n "$AMT_B" ] && [ "$AMT_A" != "$AMT_B" ]; then
-            echo "PASS  Isolation: concurrent bids serialised: winners at $AMT_A and $AMT_B"
-        else
-            echo "FAIL  Isolation: both bids succeeded at the same amount — FOR UPDATE did not serialise"
-            echo "       Result A: $RESULT_A"
-            echo "       Result B: $RESULT_B"
-            ISOLATION_PASS=0
-        fi
-    fi
 fi
 rm -f "${SCRIPT_DIR}/.con_result_a.txt" "${SCRIPT_DIR}/.con_result_b.txt"
 DURABILITY_PASS=1
@@ -150,7 +141,7 @@ else
                 POST_RESTART_COUNT=$(psql "$DATABASE_URL" -At -c \
                     "SELECT COUNT(*) FROM bids WHERE auction_id = $AUCTION_ID AND amount = $MARKER_AMOUNT")
                 if [ "$POST_RESTART_COUNT" -eq 1 ]; then
-                    echo "PASS  Durability: committed bid $MARKER_AMOUNT survived 'docker compose restart db' (WAL guarantee)"
+                    echo "PASS  Durability: committed bid $MARKER_AMOUNT survived '$DOCKER_COMPOSE restart db' (WAL guarantee)"
                 else
                     echo "FAIL  Durability: marker bid missing after restart (found $POST_RESTART_COUNT row(s))"
                     DURABILITY_PASS=0
@@ -164,7 +155,6 @@ psql "$DATABASE_URL" -c "
     DELETE FROM auctions    WHERE auction_id = $AUCTION_ID;
     DELETE FROM items       WHERE title = 'Concurrency Test Item';
     DELETE FROM categories  WHERE slug = 'concurrency-test';
-    DELETE FROM users       WHERE email IN ('con-bidder-a@bidhub.local', 'con-bidder-b@bidhub.local');
 " >/dev/null 2>&1 || true
 if [ "$ISOLATION_PASS" -eq 1 ] && [ "$DURABILITY_PASS" -eq 1 ]; then
     echo "concurrency.sh: PASS"

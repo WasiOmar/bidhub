@@ -1,1 +1,279 @@
-BEGIN;SET TRANSACTION ISOLATION LEVEL READ COMMITTED;INSERT INTO users (full_name, email, password_hash, role) VALUES    ('ACID Seller',  'acid-seller@bidhub.local', 'x', 'SELLER'),    ('ACID Buyer',   'acid-buyer@bidhub.local',  'x', 'BUYER');INSERT INTO categories (name, slug) VALUES ('ACID Test', 'acid-test');INSERT INTO items (seller_id, category_id, title, condition)SELECT user_id, category_id, 'ACID Test Item', 'NEW'FROM users, categoriesWHERE email = 'acid-seller@bidhub.local' AND slug = 'acid-test';INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)SELECT item_id, 100.00, 10.00, now() + interval '1 day', 'ACTIVE'FROM items WHERE title = 'ACID Test Item';SELECT a.auction_id                                                  AS auction_id,       (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local')  AS buyer_id,       (SELECT user_id FROM users WHERE email = 'acid-seller@bidhub.local') AS seller_id  FROM auctions a  JOIN items i ON i.item_id = a.item_id WHERE i.title = 'ACID Test Item' \gsetSAVEPOINT sp_atomicity;CALL place_bid(:buyer_id, :auction_id, 110.00);DO $$BEGIN    INSERT INTO bids (auction_id, bidder_id, amount)    VALUES (:auction_id, :buyer_id, -1.00);    RAISE EXCEPTION 'BIDHUB_TEST_FAILED: atomicity test — negative bid was accepted';EXCEPTION    WHEN check_violation THEN        RAISE NOTICE 'PASS  Atomicity: failure injected at step 2 (check_violation on amount <= 0)';    WHEN OTHERS THEN        RAISE NOTICE 'FAIL  Atomicity: unexpected error — %', SQLERRM;END $$;ROLLBACK TO SAVEPOINT sp_atomicity;DO $$DECLARE    v_bid_count     INT;    v_notif_count   INT;    v_audit_count   INT;BEGIN    SELECT COUNT(*) INTO v_bid_count      FROM bids          WHERE auction_id = :auction_id;    SELECT COUNT(*) INTO v_notif_count    FROM notifications WHERE auction_id = :auction_id;    SELECT COUNT(*) INTO v_audit_count    FROM audit_log      WHERE entity_type = 'auction' AND entity_id = :auction_id;    IF v_bid_count = 0 AND v_notif_count = 0 AND v_audit_count = 0 THEN        RAISE NOTICE 'PASS  Atomicity: bids=%, notifications=%, audit_log=% after rollback',            v_bid_count, v_notif_count, v_audit_count;    ELSE        RAISE EXCEPTION 'FAIL  Atomicity: residual rows found — bids=% notif=% audit=%',            v_bid_count, v_notif_count, v_audit_count;    END IF;END $$;SAVEPOINT sp_consistency_check;DO $$BEGIN    INSERT INTO bids (auction_id, bidder_id, amount)    VALUES (:auction_id, :buyer_id, -25.00);    RAISE EXCEPTION 'BIDHUB_TEST_FAILED: consistency check — negative bid accepted';EXCEPTION    WHEN check_violation THEN        RAISE NOTICE 'PASS  Consistency: CHECK (amount > 0) rejected a negative bid (%)', SQLERRM;    WHEN OTHERS THEN        RAISE NOTICE 'FAIL  Consistency (CHECK): unexpected error — %', SQLERRM;END $$;ROLLBACK TO SAVEPOINT sp_consistency_check;SAVEPOINT sp_consistency_fk;DO $$BEGIN    INSERT INTO bids (auction_id, bidder_id, amount) VALUES (999999, 1, 50.00);    RAISE EXCEPTION 'BIDHUB_TEST_FAILED: consistency fk — orphan bid accepted';EXCEPTION    WHEN foreign_key_violation THEN        RAISE NOTICE 'PASS  Consistency: FK rejected a bid pointing to non-existent auction (%)', SQLERRM;    WHEN OTHERS THEN        RAISE NOTICE 'FAIL  Consistency (FK): unexpected error — %', SQLERRM;END $$;ROLLBACK TO SAVEPOINT sp_consistency_fk;SAVEPOINT sp_isolation_dirty_read;DO $$BEGIN    INSERT INTO bids (auction_id, bidder_id, amount)    VALUES (:auction_id, :buyer_id, 999.00);            RAISE EXCEPTION 'BIDHUB_TEST_FORCE_UNDO: simulate an uncommitted write';EXCEPTION    WHEN OTHERS THEN        NULL; END $$;DO $$DECLARE    v_count INT;BEGIN    SELECT COUNT(*) INTO v_count      FROM bids     WHERE amount = 999.00 AND auction_id = :auction_id;    IF v_count = 0 THEN        RAISE NOTICE 'PASS  Isolation (READ COMMITTED): the 999.00 write never became visible — a dirty read of an uncommitted row is impossible';    ELSE        RAISE NOTICE 'FAIL  Isolation (READ COMMITTED): found % row(s) that should have been undone', v_count;    END IF;END $$;ROLLBACK TO SAVEPOINT sp_isolation_dirty_read;SAVEPOINT sp_isolation_lost_update;UPDATE auctions SET starting_price = starting_price + 5.00 WHERE auction_id = :auction_id;UPDATE auctions SET starting_price = starting_price + 5.00 WHERE auction_id = :auction_id;DO $$DECLARE    v_final NUMERIC(12,2);BEGIN    SELECT starting_price INTO v_final FROM auctions WHERE auction_id = :auction_id;    IF v_final = 110.00 THEN        RAISE NOTICE 'PASS  Isolation (FOR UPDATE): both updates applied, starting_price=%', v_final;    ELSE        RAISE NOTICE 'FAIL  Isolation (FOR UPDATE): expected 110.00, got %', v_final;    END IF;END $$;ROLLBACK TO SAVEPOINT sp_isolation_lost_update;SAVEPOINT sp_durability;INSERT INTO bids (auction_id, bidder_id, amount) VALUES (:auction_id, :buyer_id, 120.00);DO $$DECLARE    v_count INT;BEGIN    SELECT COUNT(*) INTO v_count      FROM bids     WHERE amount = 120.00 AND auction_id = :auction_id;    IF v_count = 1 THEN        RAISE NOTICE 'PASS  Durability: committed bid is visible (WAL guarantee — see db/tests/concurrency.sh for the full docker-restart proof)';    ELSE        RAISE NOTICE 'FAIL  Durability: expected 1 row, got %', v_count;    END IF;END $$;ROLLBACK TO SAVEPOINT sp_durability;ROLLBACK;SELECT 'test_concurrency.sql: all ACID demonstrations complete — verify every line above says PASS' AS result;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+BEGIN;
+
+
+
+
+
+
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+
+
+
+
+
+
+INSERT INTO users (full_name, email, password_hash, role) VALUES
+    ('ACID Seller',  'acid-seller@bidhub.local', 'x', 'SELLER'),
+    ('ACID Buyer',   'acid-buyer@bidhub.local',  'x', 'BUYER');
+
+INSERT INTO categories (name, slug) VALUES ('ACID Test', 'acid-test');
+
+INSERT INTO items (seller_id, category_id, title, condition)
+SELECT user_id, category_id, 'ACID Test Item', 'NEW'
+FROM users, categories
+WHERE email = 'acid-seller@bidhub.local' AND slug = 'acid-test';
+
+INSERT INTO auctions (item_id, starting_price, bid_increment, end_time, status)
+SELECT item_id, 100.00, 10.00, now() + interval '1 day', 'ACTIVE'
+FROM items WHERE title = 'ACID Test Item';
+
+SELECT a.auction_id                                                  AS auction_id,
+       (SELECT user_id FROM users WHERE email = 'acid-buyer@bidhub.local')  AS buyer_id,
+       (SELECT user_id FROM users WHERE email = 'acid-seller@bidhub.local') AS seller_id
+  FROM auctions a
+  JOIN items i ON i.item_id = a.item_id
+ WHERE i.title = 'ACID Test Item' \gset
+
+SET acid.auction_id = :'auction_id';
+SET acid.buyer_id   = :'buyer_id';
+
+
+
+
+
+
+
+
+
+
+
+SAVEPOINT sp_atomicity;
+
+
+CALL place_bid(:buyer_id, :auction_id, 110.00);
+
+
+DO $$
+BEGIN
+    INSERT INTO bids (auction_id, bidder_id, amount)
+    VALUES (current_setting('acid.auction_id')::INT, current_setting('acid.buyer_id')::INT, -1.00);
+    RAISE EXCEPTION 'BIDHUB_TEST_FAILED: atomicity test — negative bid was accepted';
+EXCEPTION
+    WHEN check_violation THEN
+        RAISE NOTICE 'PASS  Atomicity: failure injected at step 2 (check_violation on amount <= 0)';
+    WHEN OTHERS THEN
+        RAISE NOTICE 'FAIL  Atomicity: unexpected error — %', SQLERRM;
+END $$;
+
+
+ROLLBACK TO SAVEPOINT sp_atomicity;
+
+
+DO $$
+DECLARE
+    v_bid_count     INT;
+    v_notif_count   INT;
+    v_audit_count   INT;
+BEGIN
+    SELECT COUNT(*) INTO v_bid_count      FROM bids          WHERE auction_id = current_setting('acid.auction_id')::INT;
+    SELECT COUNT(*) INTO v_notif_count    FROM notifications WHERE auction_id = current_setting('acid.auction_id')::INT;
+    SELECT COUNT(*) INTO v_audit_count    FROM audit_log      WHERE entity_type = 'auction' AND entity_id = current_setting('acid.auction_id')::INT;
+
+    IF v_bid_count = 0 AND v_notif_count = 0 AND v_audit_count = 0 THEN
+        RAISE NOTICE 'PASS  Atomicity: bids=%, notifications=%, audit_log=% after rollback',
+            v_bid_count, v_notif_count, v_audit_count;
+    ELSE
+        RAISE EXCEPTION 'FAIL  Atomicity: residual rows found — bids=% notif=% audit=%',
+            v_bid_count, v_notif_count, v_audit_count;
+    END IF;
+END $$;
+
+
+
+
+
+
+
+
+
+
+
+SAVEPOINT sp_consistency_check;
+DO $$
+BEGIN
+    INSERT INTO bids (auction_id, bidder_id, amount)
+    VALUES (current_setting('acid.auction_id')::INT, current_setting('acid.buyer_id')::INT, -25.00);
+    RAISE EXCEPTION 'BIDHUB_TEST_FAILED: consistency check — negative bid accepted';
+EXCEPTION
+    WHEN check_violation THEN
+        RAISE NOTICE 'PASS  Consistency: CHECK (amount > 0) rejected a negative bid (%)', SQLERRM;
+    WHEN OTHERS THEN
+        RAISE NOTICE 'FAIL  Consistency (CHECK): unexpected error — %', SQLERRM;
+END $$;
+ROLLBACK TO SAVEPOINT sp_consistency_check;
+
+
+SAVEPOINT sp_consistency_fk;
+DO $$
+BEGIN
+    INSERT INTO bids (auction_id, bidder_id, amount) VALUES (999999, 1, 50.00);
+    RAISE EXCEPTION 'BIDHUB_TEST_FAILED: consistency fk — orphan bid accepted';
+EXCEPTION
+    WHEN foreign_key_violation THEN
+        RAISE NOTICE 'PASS  Consistency: FK rejected a bid pointing to non-existent auction (%)', SQLERRM;
+    WHEN OTHERS THEN
+        RAISE NOTICE 'FAIL  Consistency (FK): unexpected error — %', SQLERRM;
+END $$;
+ROLLBACK TO SAVEPOINT sp_consistency_fk;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SAVEPOINT sp_isolation_dirty_read;
+
+DO $$
+BEGIN
+    INSERT INTO bids (auction_id, bidder_id, amount)
+    VALUES (current_setting('acid.auction_id')::INT, current_setting('acid.buyer_id')::INT, 999.00);
+
+    
+    
+    RAISE EXCEPTION 'BIDHUB_TEST_FORCE_UNDO: simulate an uncommitted write';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; 
+END $$;
+
+DO $$
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+      FROM bids
+     WHERE amount = 999.00 AND auction_id = current_setting('acid.auction_id')::INT;
+
+    IF v_count = 0 THEN
+        RAISE NOTICE 'PASS  Isolation (READ COMMITTED): the 999.00 write never became visible — a dirty read of an uncommitted row is impossible';
+    ELSE
+        RAISE NOTICE 'FAIL  Isolation (READ COMMITTED): found % row(s) that should have been undone', v_count;
+    END IF;
+END $$;
+
+ROLLBACK TO SAVEPOINT sp_isolation_dirty_read;
+
+
+
+
+
+
+
+SAVEPOINT sp_isolation_lost_update;
+
+
+UPDATE auctions SET starting_price = starting_price + 5.00 WHERE auction_id = :auction_id;
+
+
+UPDATE auctions SET starting_price = starting_price + 5.00 WHERE auction_id = :auction_id;
+
+DO $$
+DECLARE
+    v_final NUMERIC(12,2);
+BEGIN
+    SELECT starting_price INTO v_final FROM auctions WHERE auction_id = current_setting('acid.auction_id')::INT;
+
+    IF v_final = 110.00 THEN
+        RAISE NOTICE 'PASS  Isolation (FOR UPDATE): both updates applied, starting_price=%', v_final;
+    ELSE
+        RAISE NOTICE 'FAIL  Isolation (FOR UPDATE): expected 110.00, got %', v_final;
+    END IF;
+END $$;
+
+ROLLBACK TO SAVEPOINT sp_isolation_lost_update;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SAVEPOINT sp_durability;
+
+INSERT INTO bids (auction_id, bidder_id, amount) VALUES (:auction_id, :buyer_id, 120.00);
+
+DO $$
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+      FROM bids
+     WHERE amount = 120.00 AND auction_id = current_setting('acid.auction_id')::INT;
+
+    IF v_count = 1 THEN
+        RAISE NOTICE 'PASS  Durability: committed bid is visible (WAL guarantee — see db/tests/concurrency.sh for the full docker-restart proof)';
+    ELSE
+        RAISE NOTICE 'FAIL  Durability: expected 1 row, got %', v_count;
+    END IF;
+END $$;
+
+ROLLBACK TO SAVEPOINT sp_durability;
+
+
+
+
+ROLLBACK;
+
+SELECT 'test_concurrency.sql: all ACID demonstrations complete — verify every line above says PASS' AS result;
