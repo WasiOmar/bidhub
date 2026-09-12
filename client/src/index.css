@@ -420,6 +420,11 @@ textarea {
   gap: var(--spacing-xl);
   align-items: start;
 }
+@media (max-width: 860px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
 .category-tree ul {
   list-style: none;
   margin: 0;
