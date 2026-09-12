@@ -40,6 +40,7 @@ export default function CreateListing() {
   const [attributeRows, setAttributeRows] = useState([{ key: '', value: '' }]);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +50,10 @@ export default function CreateListing() {
         if (!cancelled) setCategories(flattenTree(tree));
       })
       .catch(() => {
-        
+
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
       });
     return () => {
       cancelled = true;
@@ -140,8 +144,14 @@ export default function CreateListing() {
       <form className="form form-wide" onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="category_id">Category</label>
-          <select id="category_id" value={form.category_id} onChange={update('category_id')} required>
-            <option value="">Select a category…</option>
+          <select
+            id="category_id"
+            value={form.category_id}
+            onChange={update('category_id')}
+            disabled={categoriesLoading}
+            required
+          >
+            <option value="">{categoriesLoading ? 'Loading categories…' : 'Select a category…'}</option>
             {categories.map((c) => (
               <option key={c.category_id} value={c.category_id}>
                 {'—'.repeat(c.depth)} {c.name}
