@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
+import Badge from '../components/Badge.jsx';
 
-
-
-
-const TYPE_BADGE = {
-  OUTBID: 'badge-outbid',
-  WON: 'badge-won',
-  SOLD: 'badge-won',
-  AUCTION_CLOSED: 'badge-closed',
+const TYPE_TONE = {
+  OUTBID: 'outbid',
+  WON: 'won',
+  SOLD: 'won',
+  AUCTION_CLOSED: 'closed',
 };
 
 export default function Notifications() {
@@ -63,7 +61,7 @@ export default function Notifications() {
       {notifications.map((n) => (
         <div key={n.notification_id} className={`notification-item ${n.is_read ? '' : 'unread'}`}>
           <div>
-            <span className={`badge ${TYPE_BADGE[n.type] || 'badge-closed'}`}>{n.type}</span>
+            <Badge tone={TYPE_TONE[n.type] || 'closed'}>{n.type}</Badge>
             <div>{n.title}</div>
             <div className="page-caption" style={{ margin: 0 }}>
               {n.message}

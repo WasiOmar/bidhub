@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
+import Badge from '../components/Badge.jsx';
 
 function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
@@ -13,14 +14,14 @@ function formatMoney(amount) {
 
 
 function statusFor(bid, currentHighByAuction) {
-  if (bid.won) return { label: 'Won', className: 'badge-won' };
-  if (bid.auction_status === 'CLOSED') return { label: 'Lost', className: 'badge-closed' };
+  if (bid.won) return { label: 'Won', tone: 'won' };
+  if (bid.auction_status === 'CLOSED') return { label: 'Lost', tone: 'closed' };
 
   const currentHigh = currentHighByAuction.get(bid.auction_id);
   if (currentHigh !== undefined && Number(bid.amount) < currentHigh) {
-    return { label: 'Outbid', className: 'badge-outbid' };
+    return { label: 'Outbid', tone: 'outbid' };
   }
-  return { label: 'Leading', className: 'badge-active' };
+  return { label: 'Leading', tone: 'active' };
 }
 
 export default function MyBids() {
@@ -86,7 +87,7 @@ export default function MyBids() {
                   </td>
                   <td>{formatMoney(bid.amount)}</td>
                   <td>
-                    <span className={`badge ${status.className}`}>{status.label}</span>
+                    <Badge tone={status.tone}>{status.label}</Badge>
                   </td>
                   <td>{new Date(bid.placed_at).toLocaleString()}</td>
                 </tr>

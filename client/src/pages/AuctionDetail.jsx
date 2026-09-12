@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api, ApiError } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
+import Badge from '../components/Badge.jsx';
 
 const POLL_MS = 5000;
 
@@ -316,7 +317,7 @@ export default function AuctionDetail() {
       )}
 
       <h1 className="page-title">{auction.item_title}</h1>
-      <span className={`badge badge-${auction.status.toLowerCase()}`}>{auction.status}</span>{' '}
+      <Badge tone={auction.status.toLowerCase()}>{auction.status}</Badge>{' '}
       <span className="page-caption" style={{ display: 'inline' }}>
         Ends in {countdown}
       </span>
