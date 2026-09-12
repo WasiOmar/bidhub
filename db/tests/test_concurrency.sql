@@ -56,6 +56,9 @@ SELECT a.auction_id                                                  AS auction_
   JOIN items i ON i.item_id = a.item_id
  WHERE i.title = 'ACID Test Item' \gset
 
+SET acid.auction_id = :'auction_id';
+SET acid.buyer_id   = :'buyer_id';
+
 
 
 
@@ -75,7 +78,7 @@ CALL place_bid(:buyer_id, :auction_id, 110.00);
 DO $$
 BEGIN
     INSERT INTO bids (auction_id, bidder_id, amount)
-    VALUES (:auction_id, :buyer_id, -1.00);
+    VALUES (current_setting('acid.auction_id')::INT, current_setting('acid.buyer_id')::INT, -1.00);
     RAISE EXCEPTION 'BIDHUB_TEST_FAILED: atomicity test — negative bid was accepted';
 EXCEPTION
     WHEN check_violation THEN
@@ -94,9 +97,9 @@ DECLARE
     v_notif_count   INT;
     v_audit_count   INT;
 BEGIN
-    SELECT COUNT(*) INTO v_bid_count      FROM bids          WHERE auction_id = :auction_id;
-    SELECT COUNT(*) INTO v_notif_count    FROM notifications WHERE auction_id = :auction_id;
-    SELECT COUNT(*) INTO v_audit_count    FROM audit_log      WHERE entity_type = 'auction' AND entity_id = :auction_id;
+    SELECT COUNT(*) INTO v_bid_count      FROM bids          WHERE auction_id = current_setting('acid.auction_id')::INT;
+    SELECT COUNT(*) INTO v_notif_count    FROM notifications WHERE auction_id = current_setting('acid.auction_id')::INT;
+    SELECT COUNT(*) INTO v_audit_count    FROM audit_log      WHERE entity_type = 'auction' AND entity_id = current_setting('acid.auction_id')::INT;
 
     IF v_bid_count = 0 AND v_notif_count = 0 AND v_audit_count = 0 THEN
         RAISE NOTICE 'PASS  Atomicity: bids=%, notifications=%, audit_log=% after rollback',
@@ -121,7 +124,7 @@ SAVEPOINT sp_consistency_check;
 DO $$
 BEGIN
     INSERT INTO bids (auction_id, bidder_id, amount)
-    VALUES (:auction_id, :buyer_id, -25.00);
+    VALUES (current_setting('acid.auction_id')::INT, current_setting('acid.buyer_id')::INT, -25.00);
     RAISE EXCEPTION 'BIDHUB_TEST_FAILED: consistency check — negative bid accepted';
 EXCEPTION
     WHEN check_violation THEN
@@ -176,7 +179,7 @@ SAVEPOINT sp_isolation_dirty_read;
 DO $$
 BEGIN
     INSERT INTO bids (auction_id, bidder_id, amount)
-    VALUES (:auction_id, :buyer_id, 999.00);
+    VALUES (current_setting('acid.auction_id')::INT, current_setting('acid.buyer_id')::INT, 999.00);
 
     
     
@@ -192,7 +195,7 @@ DECLARE
 BEGIN
     SELECT COUNT(*) INTO v_count
       FROM bids
-     WHERE amount = 999.00 AND auction_id = :auction_id;
+     WHERE amount = 999.00 AND auction_id = current_setting('acid.auction_id')::INT;
 
     IF v_count = 0 THEN
         RAISE NOTICE 'PASS  Isolation (READ COMMITTED): the 999.00 write never became visible — a dirty read of an uncommitted row is impossible';
@@ -221,7 +224,7 @@ DO $$
 DECLARE
     v_final NUMERIC(12,2);
 BEGIN
-    SELECT starting_price INTO v_final FROM auctions WHERE auction_id = :auction_id;
+    SELECT starting_price INTO v_final FROM auctions WHERE auction_id = current_setting('acid.auction_id')::INT;
 
     IF v_final = 110.00 THEN
         RAISE NOTICE 'PASS  Isolation (FOR UPDATE): both updates applied, starting_price=%', v_final;
@@ -257,7 +260,7 @@ DECLARE
 BEGIN
     SELECT COUNT(*) INTO v_count
       FROM bids
-     WHERE amount = 120.00 AND auction_id = :auction_id;
+     WHERE amount = 120.00 AND auction_id = current_setting('acid.auction_id')::INT;
 
     IF v_count = 1 THEN
         RAISE NOTICE 'PASS  Durability: committed bid is visible (WAL guarantee — see db/tests/concurrency.sh for the full docker-restart proof)';
