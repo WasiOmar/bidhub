@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { api, ApiError } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
-import { formatMoney, formatTime } from '../utils/format.js';
+import { formatMoney, formatTime, pluralize } from '../utils/format.js';
 
 const POLL_MS = 5000;
 
@@ -341,7 +341,7 @@ export default function AuctionDetail() {
               Current high bid: <strong>{formatMoney(auction.current_high_bid)}</strong>
             </p>
             <p className="page-caption tight-top">
-              {auction.bid_count} bid{auction.bid_count === 1 ? '' : 's'} · starting price{' '}
+              {auction.bid_count} {pluralize(auction.bid_count, 'bid')} · starting price{' '}
               {formatMoney(auction.starting_price)} · increment {formatMoney(auction.bid_increment)}
             </p>
             <p className="page-caption tight-top">

@@ -9,3 +9,7 @@ export function formatDateTime(value) {
 export function formatTime(value) {
   return new Date(value).toLocaleTimeString();
 }
+
+export function pluralize(count, singular, plural = `${singular}s`) {
+  return count === 1 ? singular : plural;
+}
