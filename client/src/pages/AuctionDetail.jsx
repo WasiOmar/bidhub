@@ -11,6 +11,8 @@ function formatMoney(amount) {
   return `$${Number(amount).toFixed(2)}`;
 }
 
+const URGENT_MS = 5 * 60 * 1000;
+
 function useCountdown(endTime) {
   const [remaining, setRemaining] = useState(() => new Date(endTime) - new Date());
 
@@ -19,7 +21,7 @@ function useCountdown(endTime) {
     return () => clearInterval(timer);
   }, [endTime]);
 
-  if (remaining <= 0) return 'Ended';
+  if (remaining <= 0) return { text: 'Ended', urgent: false };
 
   const totalSeconds = Math.floor(remaining / 1000);
   const days = Math.floor(totalSeconds / 86400);
@@ -27,9 +29,10 @@ function useCountdown(endTime) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
+  const urgent = remaining <= URGENT_MS;
+  if (days > 0) return { text: `${days}d ${hours}h ${minutes}m`, urgent };
+  if (hours > 0) return { text: `${hours}h ${minutes}m ${seconds}s`, urgent };
+  return { text: `${minutes}m ${seconds}s`, urgent };
 }
 
 function AttributesTable({ attributes }) {
@@ -318,8 +321,8 @@ export default function AuctionDetail() {
 
       <h1 className="page-title">{auction.item_title}</h1>
       <Badge tone={auction.status.toLowerCase()}>{auction.status}</Badge>{' '}
-      <span className="page-caption" style={{ display: 'inline' }}>
-        Ends in {countdown}
+      <span className={`page-caption countdown${countdown.urgent ? ' countdown-urgent' : ''}`} style={{ display: 'inline' }}>
+        Ends in {countdown.text}
       </span>
 
       <div className="two-col" style={{ marginTop: 16 }}>
