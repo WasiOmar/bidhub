@@ -12,6 +12,7 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_status        auction_status;
+    v_start_time    TIMESTAMPTZ;
     v_end_time      TIMESTAMPTZ;
     v_seller_id     INT;
     v_starting_price NUMERIC(12,2);
@@ -22,8 +23,8 @@ BEGIN
     
     
     
-    SELECT a.status, a.end_time, a.starting_price, a.bid_increment, i.seller_id
-      INTO v_status, v_end_time, v_starting_price, v_increment, v_seller_id
+    SELECT a.status, a.start_time, a.end_time, a.starting_price, a.bid_increment, i.seller_id
+      INTO v_status, v_start_time, v_end_time, v_starting_price, v_increment, v_seller_id
     FROM auctions a
     JOIN items i ON i.item_id = a.item_id
     WHERE a.auction_id = p_auction_id
@@ -35,6 +36,11 @@ BEGIN
     END IF;
 
     
+    IF v_status = 'SCHEDULED' AND now() >= v_start_time THEN
+        UPDATE auctions SET status = 'ACTIVE' WHERE auction_id = p_auction_id;
+        v_status := 'ACTIVE';
+    END IF;
+
     IF v_status <> 'ACTIVE' OR now() >= v_end_time THEN
         RAISE EXCEPTION 'auction % is not open for bidding', p_auction_id
             USING ERRCODE = 'AU002';
@@ -65,9 +71,11 @@ END;
 $$;
 
 COMMENT ON PROCEDURE place_bid(INT, INT, NUMERIC) IS
-    'Locks the auction row FOR UPDATE, validates status/self-bid/minimum-amount in that '
-    'order with typed SQLSTATEs (AU001-AU004), then inserts the bid. Notification and audit '
-    'writes are left entirely to trg_outbid / trg_audit_bid (db/02_triggers.sql).';
+    'Locks the auction row FOR UPDATE, opens it first if it is SCHEDULED and its start_time '
+    'has passed (so the first bid never waits for open_scheduled_auctions), validates '
+    'status/self-bid/minimum-amount in that order with typed SQLSTATEs (AU001-AU004), then '
+    'inserts the bid. Notification and audit writes are left entirely to trg_outbid / '
+    'trg_audit_bid (db/02_triggers.sql).';
 
 DROP PROCEDURE IF EXISTS award_winner(INT);
 
@@ -170,3 +178,30 @@ COMMENT ON PROCEDURE close_expired_auctions() IS
     'expired ACTIVE auction as it is fetched, WHERE CURRENT OF flips it to CLOSED (firing '
     'trg_close_auction) without a second index scan, then award_winner() stamps the winning '
     'bid. Refreshes mv_leaderboard if it exists (P2-06) and RAISE NOTICEs the closed count.';
+
+DROP PROCEDURE IF EXISTS open_scheduled_auctions();
+
+CREATE PROCEDURE open_scheduled_auctions()
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_count  INT;
+BEGIN
+    UPDATE auctions
+       SET status = 'ACTIVE'
+     WHERE status = 'SCHEDULED' AND start_time <= now();
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+
+    IF v_count > 0 AND EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_leaderboard') THEN
+        REFRESH MATERIALIZED VIEW CONCURRENTLY mv_leaderboard;
+    END IF;
+
+    RAISE NOTICE 'open_scheduled_auctions: opened % auction(s)', v_count;
+END;
+$$;
+
+COMMENT ON PROCEDURE open_scheduled_auctions() IS
+    'Set-based batch open: one UPDATE flips every SCHEDULED auction whose start_time has passed '
+    'to ACTIVE. The server job calls it before close_expired_auctions(), so an auction whose whole '
+    'window passed while the job was down is opened and then settled in the same run. place_bid '
+    'also opens a due auction on its first bid. Refreshes mv_leaderboard when anything opened.';

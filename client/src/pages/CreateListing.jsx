@@ -31,6 +31,7 @@ export default function CreateListing() {
     starting_price: '',
     bid_increment: '1.00',
     reserve_price: '',
+    start_time: '',
     end_time: '',
   });
   
@@ -94,6 +95,9 @@ export default function CreateListing() {
       return 'reserve price cannot be below the starting price.';
     }
     if (new Date(form.end_time) <= new Date()) return 'end time must be in the future.';
+    if (form.start_time && new Date(form.end_time) <= new Date(form.start_time)) {
+      return 'end time must be after the start time.';
+    }
     return null;
   }
 
@@ -126,10 +130,11 @@ export default function CreateListing() {
         starting_price: Number(form.starting_price),
         bid_increment: Number(form.bid_increment),
         reserve_price: form.reserve_price ? Number(form.reserve_price) : undefined,
+        start_time: form.start_time ? new Date(form.start_time).toISOString() : undefined,
         end_time: new Date(form.end_time).toISOString(),
       });
 
-      showToast('Listing published.');
+      showToast(auction.status === 'SCHEDULED' ? 'Listing scheduled.' : 'Listing published.');
       navigate(`/auctions/${auction.auction_id}`);
     } catch (err) {
       setError(err.message || 'Could not create the listing.');
@@ -264,9 +269,24 @@ export default function CreateListing() {
           />
         </div>
 
-        <div className="field">
-          <label htmlFor="end_time">Auction end time</label>
-          <input id="end_time" type="datetime-local" value={form.end_time} onChange={update('end_time')} required />
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="start_time">Auction start time (optional)</label>
+            <input
+              id="start_time"
+              type="datetime-local"
+              value={form.start_time}
+              onChange={update('start_time')}
+              aria-describedby="start_time_hint"
+            />
+            <span id="start_time_hint" className="field-hint">
+              Leave blank to start as soon as you publish.
+            </span>
+          </div>
+          <div className="field">
+            <label htmlFor="end_time">Auction end time</label>
+            <input id="end_time" type="datetime-local" value={form.end_time} onChange={update('end_time')} required />
+          </div>
         </div>
 
         <button className="btn btn-primary" type="submit" disabled={submitting}>

@@ -275,6 +275,75 @@ END $$;
 
 
 
+DO $$
+DECLARE
+    v_seller_id     INT;
+    v_bidder1_id    INT;
+    v_future        INT;
+    v_due_bid       INT;
+    v_due_batch     INT;
+    v_caught        BOOLEAN := false;
+    v_future_status auction_status;
+    v_bid_status    auction_status;
+    v_batch_status  auction_status;
+BEGIN
+    SELECT user_id INTO v_seller_id  FROM users WHERE email = 'proc-seller@bidhub.local';
+    SELECT user_id INTO v_bidder1_id FROM users WHERE email = 'proc-bidder1@bidhub.local';
+
+    INSERT INTO items (seller_id, category_id, title)
+    SELECT v_seller_id, c.category_id, t.title
+    FROM categories c,
+         (VALUES
+            ('Schedule Test Future'),
+            ('Schedule Test Due Bid'),
+            ('Schedule Test Due Batch')
+         ) AS t(title)
+    WHERE c.slug = 'proc-test-category';
+
+    INSERT INTO auctions (item_id, starting_price, bid_increment, start_time, end_time, status)
+    SELECT item_id, 100.00, 10.00, now() + interval '1 hour', now() + interval '1 day', 'SCHEDULED'
+    FROM items WHERE title = 'Schedule Test Future'
+    RETURNING auction_id INTO v_future;
+
+    INSERT INTO auctions (item_id, starting_price, bid_increment, start_time, end_time, status)
+    SELECT item_id, 100.00, 10.00, now() - interval '1 minute', now() + interval '1 day', 'SCHEDULED'
+    FROM items WHERE title = 'Schedule Test Due Bid'
+    RETURNING auction_id INTO v_due_bid;
+
+    INSERT INTO auctions (item_id, starting_price, bid_increment, start_time, end_time, status)
+    SELECT item_id, 100.00, 10.00, now() - interval '1 minute', now() + interval '1 day', 'SCHEDULED'
+    FROM items WHERE title = 'Schedule Test Due Batch'
+    RETURNING auction_id INTO v_due_batch;
+
+    BEGIN
+        CALL place_bid(v_bidder1_id, v_future, 100.00);
+    EXCEPTION
+        WHEN SQLSTATE 'AU002' THEN
+            v_caught := true;
+    END;
+
+    CALL place_bid(v_bidder1_id, v_due_bid, 100.00);
+    CALL open_scheduled_auctions();
+
+    SELECT status INTO v_future_status FROM auctions WHERE auction_id = v_future;
+    SELECT status INTO v_bid_status    FROM auctions WHERE auction_id = v_due_bid;
+    SELECT status INTO v_batch_status  FROM auctions WHERE auction_id = v_due_batch;
+
+    IF v_caught
+       AND v_future_status = 'SCHEDULED'
+       AND v_bid_status = 'ACTIVE'
+       AND v_batch_status = 'ACTIVE'
+    THEN
+        RAISE NOTICE 'PASS  scheduled auctions: a bid before start_time raised AU002, the first bid after it opened the auction, and open_scheduled_auctions opened the other while leaving the future one SCHEDULED';
+    ELSE
+        RAISE NOTICE 'FAIL  test_scheduled_auctions: caught=% (want t), future=% (want SCHEDULED), due_bid=% (want ACTIVE), due_batch=% (want ACTIVE)',
+            v_caught, v_future_status, v_bid_status, v_batch_status;
+    END IF;
+END $$;
+
+
+
+
 ROLLBACK;
 
-SELECT 'test_procedures.sql: place_bid validation, trigger side-effects, and cursor-driven batch close all exercised — verify every line above says PASS' AS result;
+SELECT 'test_procedures.sql: place_bid validation, trigger side-effects, cursor-driven batch close and scheduled-auction opening all exercised — verify every line above says PASS' AS result;

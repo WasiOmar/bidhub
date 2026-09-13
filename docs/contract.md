@@ -136,6 +136,7 @@ UPDATE issued by `ON DELETE SET NULL`, so a user with audited activity cannot be
 | `place_bid(p_user_id INT, p_auction_id INT, p_amount NUMERIC)` | PROCEDURE | 03 | 03, 08 |
 | `award_winner(p_auction_id INT)` | PROCEDURE | 03 | 02 |
 | `close_expired_auctions()` | PROCEDURE (explicit cursor) | 03 | 06 |
+| `open_scheduled_auctions()` | PROCEDURE, opens `SCHEDULED` auctions whose `start_time` has passed | 03 | 02 |
 | `refresh_leaderboard()` | PROCEDURE | 06 | 10 |
 | `get_leaderboard(p_auction_id INT)` | FUNCTION → `position, bidder_id, bidder_name, item_title, amount, placed_at, is_leading` | 04 | 04 |
 | `get_category_tree(p_root_id INT DEFAULT NULL)` | FUNCTION → `category_id, name, slug, parent_id, depth, path TEXT[]` | 04 | 07 |
@@ -206,7 +207,7 @@ Base URL `http://localhost:4000/api`. Auth is `Authorization: Bearer <JWT>` (cla
 | POST | `/items` | SELLER | `{ category_id, title, description?, condition?, attributes?, image_url? }` | 201 `{ item }` |
 | GET | `/items/:id` | — | | `{ item }` (+ `category_name`, `seller_name`) |
 | GET | `/auctions` | — | `?status=` | `{ auctions }` (+ `item_title`, `image_url`, `category_id`, `current_high_bid`, `bid_count`), by `end_time` |
-| POST | `/auctions` | SELLER, item owner | `{ item_id, starting_price, bid_increment, end_time, reserve_price? }` | 201 `{ auction }`, created `ACTIVE` |
+| POST | `/auctions` | SELLER, item owner | `{ item_id, starting_price, bid_increment, end_time, reserve_price?, start_time? }` | 201 `{ auction }`, created `SCHEDULED` when `start_time` is in the future, otherwise `ACTIVE` from now |
 | GET | `/auctions/:id` | — | | `{ auction }` |
 | POST | `/auctions/:id/bids` | any | `{ amount }` | 201 `{ ok: true }`, or `AU001–AU004` |
 | GET | `/auctions/:id/leaderboard` | — | | `{ leaderboard }` (rows of `get_leaderboard`) |
@@ -237,6 +238,6 @@ Recorded during INT-01. The code is what counts; the plan text is out of date on
 - **Routines added:** `get_category_breadcrumb`, `get_category_item_counts`, `refresh_leaderboard`, and the views `v_top_bidders`, `v_seller_revenue`, `v_bid_momentum`, `v_category_leaderboard`, `v_auction_summary`, `v_active_auctions`.
 - **`get_category_tree`** takes `p_root_id INT DEFAULT NULL`; `NULL` returns the whole forest.
 - **Routes added:** `GET /api/health`, and `GET /api/notifications/unread-count` (INT-01, so the header bell uses `idx_notifications_user_unread` instead of downloading every notification).
-- **`POST /api/auctions`** creates the auction `ACTIVE` immediately; nothing in the API creates a `SCHEDULED` auction (only the seed does).
+- **Scheduled start:** `POST /api/auctions` takes an optional `start_time`. A future one creates the auction `SCHEDULED`; the server job's `open_scheduled_auctions()` opens it once the time passes, and `place_bid` opens a due auction itself on its first bid. Blank or past means `ACTIVE` from now.
 - **`POST /api/auth/register`** accepts an optional `role`, limited to `BUYER` or `SELLER`.
 - **Not exposed by the API:** `watchlist` (table only), `v_bid_momentum` and `v_category_leaderboard` (database only).

@@ -57,7 +57,7 @@ router.post(
   requireAuth,
   requireRole('SELLER'),
   asyncHandler(async (req, res) => {
-    const { item_id, starting_price, reserve_price, bid_increment, end_time } = req.body || {};
+    const { item_id, starting_price, reserve_price, bid_increment, start_time, end_time } = req.body || {};
 
     if (!item_id || !starting_price || !bid_increment || !end_time) {
       return res.status(400).json({
@@ -81,10 +81,11 @@ router.post(
     }
 
     const result = await query(
-      `INSERT INTO auctions (item_id, starting_price, reserve_price, bid_increment, end_time, status)
-       VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+      `INSERT INTO auctions (item_id, starting_price, reserve_price, bid_increment, start_time, end_time, status)
+       VALUES ($1, $2, $3, $4, GREATEST(COALESCE($6::timestamptz, now()), now()), $5,
+               (CASE WHEN $6::timestamptz > now() THEN 'SCHEDULED' ELSE 'ACTIVE' END)::auction_status)
        RETURNING auction_id, item_id, starting_price, reserve_price, bid_increment, start_time, end_time, status, created_at`,
-      [item_id, starting_price, reserve_price || null, bid_increment, end_time]
+      [item_id, starting_price, reserve_price || null, bid_increment, end_time, start_time || null]
     );
 
     return res.status(201).json({ auction: result.rows[0] });

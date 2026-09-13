@@ -11,16 +11,17 @@ const DEFAULT_INTERVAL_MS = 60_000;
 
 async function runOnce() {
   const client = await pool.connect();
-  let noticeMessage = null;
+  const notices = [];
 
   const onNotice = (notice) => {
-    noticeMessage = notice.message;
+    notices.push(notice.message);
   };
   client.on('notice', onNotice);
 
   try {
+    await client.query('CALL open_scheduled_auctions()');
     await client.query('CALL close_expired_auctions()');
-    console.log(`[auction-close-job] ${noticeMessage || 'ran (no notice captured)'}`);
+    console.log(`[auction-close-job] ${notices.join('; ') || 'ran (no notice captured)'}`);
   } catch (err) {
     console.error('[auction-close-job] failed:', err.message);
   } finally {
