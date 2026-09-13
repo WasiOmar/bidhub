@@ -6,7 +6,8 @@ import { api, ApiError } from '../api/client.js';
 import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SqlNote from '../components/SqlNote.jsx';
-import { formatMoney, formatDateTime, pluralize } from '../utils/format.js';
+import useNow from '../hooks/useNow.js';
+import { formatMoney, formatDateTime, formatRemaining, pluralize } from '../utils/format.js';
 
 const POLL_MS = 5000;
 
@@ -18,29 +19,6 @@ const CONDITION_LABELS = {
   USED: 'Used',
   REFURBISHED: 'Refurbished',
 };
-
-function useNow() {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return now;
-}
-
-function formatRemaining(ms) {
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-}
 
 function formatWhen(value) {
   return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
