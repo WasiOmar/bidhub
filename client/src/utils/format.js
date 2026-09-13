@@ -1,5 +1,18 @@
+const moneyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+const compactMoneyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumSignificantDigits: 3,
+});
+
 export function formatMoney(amount) {
-  return `$${Number(amount).toFixed(2)}`;
+  return moneyFormatter.format(Number(amount));
+}
+
+export function formatMoneyCompact(amount) {
+  return compactMoneyFormatter.format(Number(amount));
 }
 
 export function formatDateTime(value) {
