@@ -1,19 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import EmptyState from '../components/EmptyState.jsx';
+import SqlNote from '../components/SqlNote.jsx';
 import { formatMoney, formatMoneyCompact, formatDateTime, pluralize } from '../utils/format.js';
 
 const LEADERBOARD_PREVIEW = 10;
-
-function SqlNote({ view, children }) {
-  return (
-    <div className="sql-note">
-      <span className="sql-tag">SQL</span>
-      <code className="sql-code">{children}</code>
-      <span className="sql-view">{view}</span>
-    </div>
-  );
-}
 
 function StatTile({ label, value, title, sub }) {
   return (
@@ -325,7 +316,7 @@ export default function Analytics() {
         </div>
 
         <div className="analytics-grid">
-          <section className="card analytics-card" aria-labelledby="top-bidders-title">
+          <section className="card card-stack" aria-labelledby="top-bidders-title">
             <div>
               <h2 id="top-bidders-title" className="card-title">
                 Top bidders
@@ -340,7 +331,7 @@ export default function Analytics() {
             )}
           </section>
 
-          <section className="card analytics-card" aria-labelledby="seller-revenue-title">
+          <section className="card card-stack" aria-labelledby="seller-revenue-title">
             <div>
               <h2 id="seller-revenue-title" className="card-title">
                 Seller revenue

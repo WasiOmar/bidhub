@@ -1,83 +1,96 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { api, ApiError } from '../api/client.js';
-import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
-import { formatMoney, formatTime, pluralize } from '../utils/format.js';
+import EmptyState from '../components/EmptyState.jsx';
+import SqlNote from '../components/SqlNote.jsx';
+import { formatMoney, formatDateTime, pluralize } from '../utils/format.js';
 
 const POLL_MS = 5000;
 
 const URGENT_MS = 5 * 60 * 1000;
 
-function useCountdown(endTime) {
-  const [remaining, setRemaining] = useState(() => new Date(endTime) - new Date());
+const CONDITION_LABELS = {
+  NEW: 'New',
+  LIKE_NEW: 'Like new',
+  USED: 'Used',
+  REFURBISHED: 'Refurbished',
+};
+
+function useNow() {
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => setRemaining(new Date(endTime) - new Date()), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [endTime]);
+  }, []);
 
-  if (remaining <= 0) return { text: 'Ended', urgent: false };
+  return now;
+}
 
-  const totalSeconds = Math.floor(remaining / 1000);
+function formatRemaining(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  const urgent = remaining <= URGENT_MS;
-  if (days > 0) return { text: `${days}d ${hours}h ${minutes}m`, urgent };
-  if (hours > 0) return { text: `${hours}h ${minutes}m ${seconds}s`, urgent };
-  return { text: `${minutes}m ${seconds}s`, urgent };
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
 }
 
-function AttributesTable({ attributes }) {
-  const entries = Object.entries(attributes || {});
-  if (entries.length === 0) return null;
+function formatWhen(value) {
+  return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function AuctionTiming({ auction, now }) {
+  const start = new Date(auction.start_time).getTime();
+  const end = new Date(auction.end_time).getTime();
+
+  if (auction.status === 'CANCELLED') return <span>This auction was cancelled</span>;
+
+  if (auction.status === 'CLOSED' || end <= now) {
+    return <span>Ended {formatDateTime(auction.end_time)}</span>;
+  }
+
+  if (auction.status === 'SCHEDULED') {
+    return start > now ? (
+      <span>
+        Starts in <strong>{formatRemaining(start - now)}</strong>
+      </span>
+    ) : (
+      <span>Opening soon</span>
+    );
+  }
 
   return (
-    <div className="table-scroll">
-    <table>
-      <tbody>
-        {entries.map(([key, value]) => (
-          <tr key={key}>
-            <th className="attr-label">{key.replace(/_/g, ' ')}</th>
-            <td>{String(value)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-    </div>
+    <span className={end - now <= URGENT_MS ? 'countdown-urgent' : undefined}>
+      Ends in <strong>{formatRemaining(end - now)}</strong>
+      <span className="auction-time-sub"> · {formatDateTime(auction.end_time)}</span>
+    </span>
   );
 }
 
-
-
-
-
-
-
-
-function BidPanel({ auction, sellerId, onBidPlaced }) {
+function BidPanel({ auction, sellerId, biddingOpen, onBidPlaced }) {
   const { user } = useAuth();
+  const location = useLocation();
   const { showToast } = useToast();
   const [amount, setAmount] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const increment = Number(auction.bid_increment);
   const minNextBid = auction.bid_count === 0
     ? Number(auction.starting_price)
-    : Number(auction.current_high_bid) + Number(auction.bid_increment);
+    : Number(auction.current_high_bid) + increment;
 
   useEffect(() => {
     setAmount(minNextBid.toFixed(2));
-    
-  }, [auction.current_high_bid, auction.bid_count]);
 
-  const isOwnListing = user && user.user_id === sellerId;
-  const hasEnded = auction.status !== 'ACTIVE' || new Date(auction.end_time) <= new Date();
+  }, [auction.current_high_bid, auction.bid_count]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -88,55 +101,173 @@ function BidPanel({ auction, sellerId, onBidPlaced }) {
       showToast(`Bid of ${formatMoney(amount)} placed.`);
       onBidPlaced();
     } catch (err) {
-      
-      
-      
-      
+
+
+
+
       setError(err instanceof ApiError ? err.message : 'Could not place bid.');
     } finally {
       setSubmitting(false);
     }
   }
 
+  if (auction.status === 'SCHEDULED') {
+    return <p className="bid-note">Bidding opens when the auction starts.</p>;
+  }
+
+  if (!biddingOpen) {
+    return <p className="bid-note">Bidding is closed for this auction.</p>;
+  }
+
   if (!user) {
     return (
-      <div className="empty-state">
-        <Link to="/login">Log in</Link> to place a bid.
+      <div className="bid-note">
+        <p>Log in to place a bid on this item.</p>
+        <Link className="btn btn-primary btn-block" to="/login" state={{ from: location }}>
+          Log in to bid
+        </Link>
       </div>
     );
   }
 
-  if (isOwnListing) {
-    return <div className="empty-state">You cannot bid on your own listing.</div>;
+  if (user.user_id === sellerId) {
+    return <p className="bid-note">This is your listing, so you can't bid on it.</p>;
   }
 
-  if (hasEnded) {
-    return <div className="empty-state">This auction has ended.</div>;
-  }
+  const quickPicks = [minNextBid, minNextBid + increment, minNextBid + increment * 5].map((v) => v.toFixed(2));
+  const numericAmount = Number(amount);
 
   return (
-    <form className="form form-narrow" onSubmit={handleSubmit}>
+    <form className="bid-form" onSubmit={handleSubmit}>
       {error && <div className="form-error" role="alert">{error}</div>}
       <div className="field">
-        <label htmlFor="amount">Your bid (minimum {formatMoney(minNextBid)})</label>
-        <input
-          id="amount"
-          type="number"
-          step="0.01"
-          min={minNextBid}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-        />
+        <label htmlFor="amount">Your bid</label>
+        <div className="money-input">
+          <span aria-hidden="true">$</span>
+          <input
+            id="amount"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min={minNextBid}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            aria-describedby="amount-hint"
+            required
+          />
+        </div>
+        <span id="amount-hint" className="field-hint">
+          Minimum {formatMoney(minNextBid)}
+        </span>
       </div>
-      <button className="btn btn-primary" type="submit" disabled={submitting}>
-        {submitting ? 'Placing bid…' : 'Place bid'}
+      <div className="quick-picks" role="group" aria-label="Quick bid amounts">
+        {quickPicks.map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={`quick-pick${amount === value ? ' selected' : ''}`}
+            aria-pressed={amount === value}
+            onClick={() => setAmount(value)}
+          >
+            {formatMoney(value)}
+          </button>
+        ))}
+      </div>
+      <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
+        {submitting ? 'Placing bid…' : `Place bid${numericAmount > 0 ? ` · ${formatMoney(numericAmount)}` : ''}`}
       </button>
     </form>
   );
 }
 
+function BidBox({ auction, item, leader, biddingOpen, onBidPlaced }) {
+  const { user } = useAuth();
+  const closed = auction.status === 'CLOSED';
+  const hasBids = auction.bid_count > 0;
+  const isYou = Boolean(user && leader && user.user_id === leader.bidder_id);
 
+  let label = 'Current high bid';
+  if (!hasBids) label = 'Starting price';
+  else if (closed) label = 'Winning bid';
+
+  let leaderLine = null;
+  if (leader && hasBids) {
+    if (closed) {
+      leaderLine = (
+        <>
+          Won by <strong>{isYou ? 'you' : leader.bidder_name}</strong>
+        </>
+      );
+    } else if (isYou) {
+      leaderLine = <strong>You're the highest bidder</strong>;
+    } else {
+      leaderLine = (
+        <>
+          Leading: <strong>{leader.bidder_name}</strong>
+        </>
+      );
+    }
+  }
+
+  return (
+    <div className="card bid-box">
+      <div className="bid-box-label">{label}</div>
+      <div className="bid-box-price">{formatMoney(hasBids ? auction.current_high_bid : auction.starting_price)}</div>
+      <div className="bid-box-meta">
+        {auction.bid_count} {pluralize(auction.bid_count, 'bid')} · starting price {formatMoney(auction.starting_price)}{' '}
+        · {formatMoney(auction.bid_increment)} increments
+      </div>
+      {leaderLine && (
+        <div className={`bid-box-leader${isYou ? ' is-you' : ''}`}>
+          <span aria-hidden="true">👑</span>
+          <span>{leaderLine}</span>
+        </div>
+      )}
+      <hr className="bid-box-divider" />
+      <BidPanel auction={auction} sellerId={item.seller_id} biddingOpen={biddingOpen} onBidPlaced={onBidPlaced} />
+    </div>
+  );
+}
+
+function ItemDetails({ item }) {
+  const specs = Object.entries(item.attributes || {});
+
+  return (
+    <section className="card card-stack" aria-labelledby="item-details-title">
+      <h2 id="item-details-title" className="card-title">
+        About this item
+      </h2>
+      {item.description && <p className="item-description">{item.description}</p>}
+      <dl className="fact-grid">
+        <div>
+          <dt>Seller</dt>
+          <dd>{item.seller_name}</dd>
+        </div>
+        <div>
+          <dt>Condition</dt>
+          <dd>{CONDITION_LABELS[item.condition] || item.condition}</dd>
+        </div>
+        <div>
+          <dt>Category</dt>
+          <dd>{item.category_name}</dd>
+        </div>
+      </dl>
+      {specs.length > 0 && (
+        <div>
+          <h3 className="detail-subtitle">Specifications</h3>
+          <dl className="spec-grid">
+            {specs.map(([key, value]) => (
+              <div key={key} className="spec-row">
+                <dt>{key.replace(/_/g, ' ')}</dt>
+                <dd>{String(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function useLeaderboard(auctionId, refreshKey) {
   const [rows, setRows] = useState([]);
@@ -146,7 +277,7 @@ function useLeaderboard(auctionId, refreshKey) {
       const { leaderboard } = await api.get(`/auctions/${auctionId}/leaderboard`);
       setRows(leaderboard);
     } catch {
-      
+
     }
   }, [auctionId]);
 
@@ -159,84 +290,113 @@ function useLeaderboard(auctionId, refreshKey) {
   return rows;
 }
 
-function LeaderboardTable({ rows }) {
-  if (rows.length === 0) {
-    return <div className="empty-state">No bids yet — be the first.</div>;
-  }
+function Leaderboard({ rows, closed }) {
+  const top = Math.max(1, ...rows.map((r) => Number(r.amount)));
 
   return (
-    <div className="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Bidder</th>
-          <th>Amount</th>
-          <th>Placed</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          
-          
-          
-          <tr key={row.position} className={row.is_leading ? 'leading' : ''}>
-            <td>{row.position}</td>
-            <td>{row.bidder_name}</td>
-            <td>{formatMoney(row.amount)}</td>
-            <td>{formatTime(row.placed_at)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-    </div>
+    <section className="card card-stack" aria-labelledby="leaderboard-title">
+      <div>
+        <h2 id="leaderboard-title" className="card-title">
+          Leaderboard
+        </h2>
+        <p className="card-desc">Each bidder's highest bid{closed ? '.' : ', refreshed every 5 seconds.'}</p>
+      </div>
+      <SqlNote view="get_leaderboard()">ROW_NUMBER() OVER (ORDER BY amount DESC, placed_at ASC)</SqlNote>
+      {rows.length === 0 ? (
+        <EmptyState icon="🏷️">No bids yet. Be the first.</EmptyState>
+      ) : (
+        <ol className="leaderboard">
+          {rows.map((row) => (
+            <li key={row.bidder_id} className={`lb-row${row.is_leading ? ' lb-row-leading' : ''}`}>
+              <span className={`lb-rank${row.position <= 3 ? ` lb-rank-${row.position}` : ''}`}>{row.position}</span>
+              <div className="lb-main">
+                <div className="lb-line">
+                  <span className="lb-who">
+                    <span className="lb-name">{row.bidder_name}</span>
+                    {row.is_leading && <span className="lb-tag">{closed ? 'Winner' : 'Leading'}</span>}
+                    <span className="lb-meta">{formatWhen(row.placed_at)}</span>
+                  </span>
+                  <span className="lb-value">{formatMoney(row.amount)}</span>
+                </div>
+                <div className="lb-track" aria-hidden="true">
+                  <div className="lb-bar" style={{ width: `${(Number(row.amount) / top) * 100}%` }} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 
-
-
-
-
-
-
-
-
+// Built from the leaderboard (each bidder's best bid), not from v_bid_momentum:
+// the API has no route for that view, so the demo shows the real LAG() in psql.
 function BidMomentum({ rows }) {
   const chronological = useMemo(
     () => [...rows].sort((a, b) => (new Date(a.placed_at) - new Date(b.placed_at)) || (Number(a.amount) - Number(b.amount))),
     [rows]
   );
 
-  if (chronological.length < 2) {
-    return <div className="empty-state">Needs at least two bids to show momentum.</div>;
-  }
-
   const jumps = chronological.slice(1).map((row, i) => ({
-    label: `#${i + 2}`,
+    id: row.bidder_id,
+    name: row.bidder_name,
     jump: Number(row.amount) - Number(chronological[i].amount),
   }));
-  const max = Math.max(...jumps.map((j) => j.jump), 1);
+  const max = Math.max(1, ...jumps.map((j) => j.jump));
 
   return (
-    <div>
-      {jumps.map((j) => (
-        <div key={j.label} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 24 }}>
-          <span style={{ fontSize: '0.8rem', width: 28 }}>{j.label}</span>
-          <svg width="70%" height="10" role="img" aria-label={`bid ${j.label} jump ${formatMoney(j.jump)}`}>
-            <rect
-              x="0"
-              y="0"
-              width={`${(j.jump / max) * 100}%`}
-              height="10"
-              rx="3"
-              fill="var(--color-success)"
-            />
-          </svg>
-          <span className="page-caption caption-inline">
-            +{formatMoney(j.jump)}
-          </span>
+    <section className="card card-stack" aria-labelledby="momentum-title">
+      <div>
+        <h2 id="momentum-title" className="card-title">
+          Bid momentum
+        </h2>
+        <p className="card-desc">
+          How much each bidder's best bid raised the price over the one before it, oldest first. Worked out in the
+          browser from the leaderboard; the database version is the view below.
+        </p>
+      </div>
+      <SqlNote view="v_bid_momentum">LAG(amount) OVER (PARTITION BY auction_id ORDER BY placed_at)</SqlNote>
+      {jumps.length === 0 ? (
+        <EmptyState icon="📈">Needs at least two bidders to show momentum.</EmptyState>
+      ) : (
+        <ol className="momentum-list">
+          {jumps.map((j) => (
+            <li key={j.id} className="momentum-row">
+              <span className="momentum-name">{j.name}</span>
+              <div className="momentum-track" aria-hidden="true">
+                <div className="momentum-bar" style={{ width: `${(Math.max(0, j.jump) / max) * 100}%` }} />
+              </div>
+              <span className="momentum-value">
+                {j.jump < 0 ? '−' : '+'}
+                {formatMoney(Math.abs(j.jump))}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function AuctionSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading auction">
+      <div className="skeleton skeleton-text" />
+      <div className="skeleton skeleton-title" />
+      <div className="auction-layout">
+        <div className="auction-main">
+          <div className="card">
+            <div className="skeleton skeleton-text" />
+            <div className="skeleton skeleton-block" />
+          </div>
         </div>
-      ))}
+        <div className="card">
+          <div className="skeleton skeleton-text" />
+          <div className="skeleton skeleton-value" />
+          <div className="skeleton skeleton-block skeleton-block-sm" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -250,11 +410,11 @@ export default function AuctionDetail() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  
-  
-  
-  
-  
+
+
+
+
+
   const loadAuction = useCallback(async () => {
     try {
       const { auction: a } = await api.get(`/auctions/${id}`);
@@ -291,9 +451,9 @@ export default function AuctionDetail() {
     };
   }, [id, loadAuction]);
 
-  
-  
-  
+
+
+
   useEffect(() => {
     const timer = setInterval(() => {
       loadAuction();
@@ -301,87 +461,69 @@ export default function AuctionDetail() {
     return () => clearInterval(timer);
   }, [loadAuction]);
 
-  const countdown = useCountdown(auction?.end_time || Date.now());
+  const now = useNow();
   const leaderboardRows = useLeaderboard(id, refreshKey);
 
-  const attributesEntries = useMemo(() => Object.entries(item?.attributes || {}), [item]);
-
-  if (loading) return <Spinner />;
+  if (loading) return <AuctionSkeleton />;
   if (error) return <div className="form-error" role="alert">{error}</div>;
-  if (!auction || !item) return <div className="empty-state">Auction not found.</div>;
+  if (!auction || !item) {
+    return (
+      <EmptyState icon="🔍">
+        Auction not found. <Link to="/browse">Browse auctions</Link>
+      </EmptyState>
+    );
+  }
+
+  const closed = auction.status === 'CLOSED';
+  const biddingOpen = auction.status === 'ACTIVE' && new Date(auction.end_time).getTime() > now;
+  const leader = leaderboardRows.find((row) => row.is_leading);
 
   return (
     <div>
       {breadcrumb.length > 0 && (
-        <p className="page-caption">
-          {breadcrumb.map((c, idx) => (
-            <span key={c.category_id}>
-              {idx > 0 && ' > '}
-              {c.name}
-            </span>
-          ))}
-        </p>
+        <nav className="breadcrumb" aria-label="Category">
+          <ol>
+            {breadcrumb.map((c, idx) => (
+              <li key={c.category_id} aria-current={idx === breadcrumb.length - 1 ? 'page' : undefined}>
+                {c.name}
+              </li>
+            ))}
+          </ol>
+        </nav>
       )}
 
-      <h1 className="page-title">{auction.item_title}</h1>
-      <Badge tone={auction.status.toLowerCase()}>{auction.status}</Badge>{' '}
-      <span className={`page-caption countdown${countdown.urgent ? ' countdown-urgent' : ''}`} style={{ display: 'inline' }}>
-        Ends in {countdown.text}
-      </span>
+      <header className="auction-header">
+        <h1 className="page-title">{auction.item_title}</h1>
+        <div className="auction-status">
+          <Badge tone={auction.status.toLowerCase()}>{auction.status}</Badge>
+          <AuctionTiming auction={auction} now={now} />
+        </div>
+      </header>
 
-      <div className="two-col mt-md">
-        <div>
+      <div className="auction-layout">
+        <div className="auction-main">
           {item.image_url && (
             <div className="auction-hero-media">
               <img src={item.image_url} alt={item.title} loading="lazy" onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }} />
             </div>
           )}
-          <div className="card">
-            <p className="caption-inline">
-              Current high bid: <strong>{formatMoney(auction.current_high_bid)}</strong>
-            </p>
-            <p className="page-caption tight-top">
-              {auction.bid_count} {pluralize(auction.bid_count, 'bid')} · starting price{' '}
-              {formatMoney(auction.starting_price)} · increment {formatMoney(auction.bid_increment)}
-            </p>
-            <p className="page-caption tight-top">
-              Sold by {item.seller_name} · condition: {item.condition}
-            </p>
-            {item.description && <p className="mb-0">{item.description}</p>}
-          </div>
-
-          {attributesEntries.length > 0 && (
-            <div className="mt-md">
-              <h3>Specifications</h3>
-              {
-}
-              <AttributesTable attributes={item.attributes} />
-            </div>
-          )}
-
-          <div className="mt-md">
-            <h3>Leaderboard</h3>
-            <LeaderboardTable rows={leaderboardRows} />
-          </div>
-
-          <div className="mt-md">
-            <h3>Bid momentum</h3>
-            <p className="page-caption">LAG(amount) OVER (PARTITION BY auction_id ORDER BY placed_at) — v_bid_momentum</p>
-            <BidMomentum rows={leaderboardRows} />
-          </div>
+          <ItemDetails item={item} />
+          <Leaderboard rows={leaderboardRows} closed={closed} />
+          <BidMomentum rows={leaderboardRows} />
         </div>
 
-        <div className="card">
-          <h3 className="mt-0">Place a bid</h3>
-          <BidPanel
+        <aside className="auction-aside" aria-label="Bidding">
+          <BidBox
             auction={auction}
-            sellerId={item.seller_id}
+            item={item}
+            leader={leader}
+            biddingOpen={biddingOpen}
             onBidPlaced={async () => {
               await loadAuction();
               setRefreshKey((k) => k + 1);
             }}
           />
-        </div>
+        </aside>
       </div>
     </div>
   );
