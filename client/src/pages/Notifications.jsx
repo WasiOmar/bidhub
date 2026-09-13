@@ -61,8 +61,7 @@ export default function Notifications() {
     <div>
       <h1 className="page-title">Notifications</h1>
       <p className="page-caption">
-        Every row here was written by a database trigger, not by application code — see
-        trg_outbid and trg_close_auction in db/02_triggers.sql.
+        Updates about auctions you've bid on or are selling.
       </p>
 
       {loading && <Spinner />}

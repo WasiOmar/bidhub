@@ -5,7 +5,6 @@ import { useToast } from '../context/ToastContext.jsx';
 import { api, ApiError } from '../api/client.js';
 import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import SqlNote from '../components/SqlNote.jsx';
 import useNow from '../hooks/useNow.js';
 import { formatMoney, formatDateTime, formatRemaining, pluralize } from '../utils/format.js';
 
@@ -279,7 +278,6 @@ function Leaderboard({ rows, closed }) {
         </h2>
         <p className="card-desc">Each bidder's highest bid{closed ? '.' : ', refreshed every 5 seconds.'}</p>
       </div>
-      <SqlNote view="get_leaderboard()">ROW_NUMBER() OVER (ORDER BY amount DESC, placed_at ASC)</SqlNote>
       {rows.length === 0 ? (
         <EmptyState icon="🏷️">No bids yet. Be the first.</EmptyState>
       ) : (
@@ -330,11 +328,9 @@ function BidMomentum({ rows }) {
           Bid momentum
         </h2>
         <p className="card-desc">
-          How much each bidder's best bid raised the price over the one before it, oldest first. Worked out in the
-          browser from the leaderboard; the database version is the view below.
+          How much each bidder's best bid raised the price over the one before it, oldest first.
         </p>
       </div>
-      <SqlNote view="v_bid_momentum">LAG(amount) OVER (PARTITION BY auction_id ORDER BY placed_at)</SqlNote>
       {jumps.length === 0 ? (
         <EmptyState icon="📈">Needs at least two bidders to show momentum.</EmptyState>
       ) : (

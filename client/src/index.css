@@ -895,37 +895,6 @@ tr:hover:not(th) {
 .card .empty-state {
   background: transparent;
 }
-.sql-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
-  padding: 10px 12px;
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px solid rgba(99, 102, 241, 0.22);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-}
-.sql-tag {
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(99, 102, 241, 0.2);
-  color: var(--color-accent-light);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-.sql-code {
-  flex: 1 1 220px;
-  min-width: 0;
-  font-family: var(--font-mono);
-  color: #c7d2fe;
-  overflow-wrap: anywhere;
-}
-.sql-view {
-  font-family: var(--font-mono);
-  color: var(--color-text-muted);
-}
 .leaderboard,
 .seller-list {
   display: flex;

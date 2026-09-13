@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import EmptyState from '../components/EmptyState.jsx';
-import SqlNote from '../components/SqlNote.jsx';
 import { formatMoney, formatMoneyCompact, formatDateTime, pluralize } from '../utils/format.js';
 
 const LEADERBOARD_PREVIEW = 10;
@@ -323,7 +322,6 @@ export default function Analytics() {
               </h2>
               <p className="card-desc">Ranked by the total value of every bid placed. Tied bidders share a rank.</p>
             </div>
-            <SqlNote view="v_top_bidders">RANK() OVER (ORDER BY SUM(b.amount) DESC)</SqlNote>
             {topBidders.length === 0 ? (
               <EmptyState icon="📊">No bids yet.</EmptyState>
             ) : (
@@ -338,9 +336,6 @@ export default function Analytics() {
               </h2>
               <p className="card-desc">Each seller's running total, growing with every completed sale.</p>
             </div>
-            <SqlNote view="v_seller_revenue">
-              SUM(final_amount) OVER (PARTITION BY seller_id ORDER BY created_at ROWS UNBOUNDED PRECEDING)
-            </SqlNote>
             {sellers.length === 0 ? (
               <EmptyState icon="💰">No completed sales yet.</EmptyState>
             ) : (

@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import AuctionCard, { AuctionCardSkeletons } from '../components/AuctionCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import SqlNote from '../components/SqlNote.jsx';
 import { indexCategories } from '../utils/categories.js';
 import { pluralize } from '../utils/format.js';
 
@@ -248,9 +247,6 @@ export default function Browse() {
                 </>
               )}
             </nav>
-            <SqlNote view="get_category_tree()">
-              WITH RECURSIVE cat_tree AS (… UNION ALL … JOIN cat_tree parent ON child.parent_id = parent.category_id)
-            </SqlNote>
           </div>
         </aside>
 
