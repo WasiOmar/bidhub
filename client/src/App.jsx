@@ -7,6 +7,7 @@ import Browse from './pages/Browse.jsx';
 import AuctionDetail from './pages/AuctionDetail.jsx';
 import CreateListing from './pages/CreateListing.jsx';
 import MyBids from './pages/MyBids.jsx';
+import MyListings from './pages/MyListings.jsx';
 import Notifications from './pages/Notifications.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Login from './pages/Login.jsx';
@@ -43,6 +44,14 @@ export default function App() {
                   element={
                     <RequireAuth>
                       <MyBids />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/my-listings"
+                  element={
+                    <RequireAuth>
+                      <MyListings />
                     </RequireAuth>
                   }
                 />

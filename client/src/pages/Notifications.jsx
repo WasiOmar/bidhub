@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import Spinner from '../components/Spinner.jsx';
 import Badge from '../components/Badge.jsx';
@@ -39,15 +40,16 @@ export default function Notifications() {
     };
   }, []);
 
-  async function markRead(id) {
+  // silent: used when opening a notification, so no toast follows the user onto the auction page.
+  async function markRead(id, { silent = false } = {}) {
     if (markingIds.has(id)) return;
     setMarkingIds((prev) => new Set(prev).add(id));
     try {
       await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
-      showToast('Marked as read.');
+      if (!silent) showToast('Marked as read.');
     } catch {
-      showToast('Could not mark as read.', { tone: 'error' });
+      if (!silent) showToast('Could not mark as read.', { tone: 'error' });
     } finally {
       setMarkingIds((prev) => {
         const next = new Set(prev);
@@ -70,27 +72,46 @@ export default function Notifications() {
         <EmptyState icon="🔔">No notifications yet.</EmptyState>
       )}
 
-      {notifications.map((n) => (
-        <div key={n.notification_id} className={`notification-item ${n.is_read ? '' : 'unread'}`}>
-          <div>
+      {notifications.map((n) => {
+        const content = (
+          <>
             <Badge tone={TYPE_TONE[n.type] || 'closed'}>{n.type}</Badge>
-            <div>{n.title}</div>
+            <div className="notification-title">{n.title}</div>
             <div className="page-caption caption-inline">
               {n.message}
             </div>
+            {n.auction_id && <span className="notification-cta">View auction →</span>}
+          </>
+        );
+
+        return (
+          <div key={n.notification_id} className={`notification-item ${n.is_read ? '' : 'unread'}`}>
+            {n.auction_id ? (
+              <Link
+                to={`/auctions/${n.auction_id}`}
+                className="notification-link"
+                onClick={() => {
+                  if (!n.is_read) markRead(n.notification_id, { silent: true });
+                }}
+              >
+                {content}
+              </Link>
+            ) : (
+              <div>{content}</div>
+            )}
+            {!n.is_read && (
+              <button
+                className="btn"
+                onClick={() => markRead(n.notification_id)}
+                aria-label={`Mark "${n.title}" as read`}
+                disabled={markingIds.has(n.notification_id)}
+              >
+                Mark read
+              </button>
+            )}
           </div>
-          {!n.is_read && (
-            <button
-              className="btn"
-              onClick={() => markRead(n.notification_id)}
-              aria-label={`Mark "${n.title}" as read`}
-              disabled={markingIds.has(n.notification_id)}
-            >
-              Mark read
-            </button>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

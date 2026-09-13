@@ -92,6 +92,7 @@ export default function Header() {
           <NavLink to="/browse">Browse</NavLink>
           <NavLink to="/analytics">Analytics</NavLink>
           {user && <NavLink to="/my-bids">My Bids</NavLink>}
+          {user?.role === 'SELLER' && <NavLink to="/my-listings">My Listings</NavLink>}
           {user?.role === 'SELLER' && <NavLink to="/create-listing">Sell an item</NavLink>}
         </nav>
 

@@ -688,6 +688,25 @@ tr:hover:not(th) {
   font-weight: 600;
   border-left-color: var(--color-accent);
 }
+.notification-item:has(.notification-link:hover) {
+  background: rgba(255, 255, 255, 0.03);
+}
+.notification-link {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.notification-link:hover .notification-title {
+  color: var(--color-accent-light);
+}
+.notification-cta {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-accent-light);
+}
 .notification-item .type {
   font-size: 0.72rem;
   font-weight: 800;

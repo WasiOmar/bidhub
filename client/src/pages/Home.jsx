@@ -10,7 +10,7 @@ const RECENTLY_SOLD = 4;
 
 const byTime = (key, direction = 1) => (a, b) => direction * (new Date(a[key]) - new Date(b[key]));
 
-function AuctionSection({ id, title, description, auctions, categories, empty, emptyIcon, seeAll }) {
+export function AuctionSection({ id, title, description, auctions, categories, empty, emptyIcon, seeAll }) {
   return (
     <section className="home-section" aria-labelledby={id}>
       <div className="section-head">

@@ -93,6 +93,21 @@ router.post(
 );
 
 
+// Must stay above '/:id', or Express would treat "mine" as an auction id.
+router.get(
+  '/mine',
+  requireAuth,
+  requireRole('SELLER'),
+  asyncHandler(async (req, res) => {
+    const result = await query(
+      `SELECT ${AUCTION_COLUMNS} ${AUCTION_JOINS} WHERE i.seller_id = $1 ORDER BY a.end_time ASC`,
+      [req.user.user_id]
+    );
+
+    return res.json({ auctions: result.rows });
+  })
+);
+
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
